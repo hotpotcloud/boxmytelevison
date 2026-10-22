@@ -1697,4 +1697,171 @@ select:focus-visible {
   overflow: hidden;
 }
 
-.account-recovery { margin-top:16px; font-size:12px; color:rgb(var(--c-muted)); line-height:1.8; } .account-recovery summary { cursor:pointer; color:rgb(var(--c-accent)); min-height:44px; display:flex; align-items:center; font-size:13px; } .account-recovery p { margin:8px 0; } .account-recovery a { color:rgb(var(--c-accent)); display:inline-flex; align-items:center; min-height:44px; text-decoration:underline; text-underline-offset:3px; }
+.account-recovery {
+  margin-top: 16px;
+  font-size: 12px;
+  color: rgb(var(--c-muted));
+  line-height: 1.8;
+}
+.account-recovery summary {
+  cursor: pointer;
+  color: rgb(var(--c-accent));
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+.account-recovery p {
+  margin: 8px 0;
+}
+.account-recovery a {
+  color: rgb(var(--c-accent));
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 播放页：独立推荐区不挤占播放器，移动端自然排在选集之后。 */
+.watch-sidebar {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.watch-recommendations {
+  padding: 16px;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 16px;
+  background: rgb(var(--c-surface-raised));
+  min-width: 0;
+}
+.watch-recommendation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+}
+.watch-recommendation-heading h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.watch-recommendation-heading button {
+  min-height: 44px;
+  gap: 6px;
+}
+.watch-recommendation-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: rgb(var(--c-hover));
+  padding: 3px;
+  border-radius: 10px;
+  margin: 8px 0;
+}
+.watch-recommendation-tabs button {
+  min-height: 44px;
+  border-radius: 8px;
+  color: rgb(var(--c-muted));
+  font-size: 13px;
+}
+.watch-recommendation-tabs button[aria-pressed='true'] {
+  background: rgb(var(--c-surface-raised));
+  color: rgb(var(--c-content));
+  box-shadow: 0 1px 4px #0001;
+  font-weight: 600;
+}
+.watch-recommendation-caption {
+  color: rgb(var(--c-muted));
+  font-size: 12px;
+  margin: 10px 0 14px;
+}
+.watch-recommendation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 10px;
+}
+.watch-recommendations .poster-title {
+  font-size: 13px;
+}
+.watch-recommendations .poster-subtitle {
+  font-size: 11px;
+}
+.watch-recommendation-skeleton {
+  aspect-ratio: 2/3;
+  background: rgb(var(--c-hover));
+  border-radius: 10px;
+}
+.watch-recommendation-empty {
+  padding: 20px 0;
+  text-align: center;
+  font-size: 13px;
+  color: rgb(var(--c-muted));
+}
+.watch-recommendation-empty p {
+  margin-bottom: 12px;
+}
+.is-theater .watch-recommendation-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .watch-recommendation-grid,
+  .is-theater .watch-recommendation-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 639px) {
+  .watch-recommendations {
+    padding: 12px;
+    border-radius: 12px;
+  }
+  .is-theater .watch-recommendation-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.watch-recommendations .poster-save {
+  width: 44px;
+  height: 44px;
+  right: -6px;
+}
+.watch-mobile-sections {
+  display: none;
+}
+#watch-episodes,
+#watch-recommendations {
+  scroll-margin-top: 140px;
+}
+@media (max-width: 1023px) {
+  .watch-mobile-sections {
+    display: flex;
+    gap: 8px;
+  }
+  .watch-mobile-sections a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid rgb(var(--c-line));
+    border-radius: 12px;
+    font-size: 13px;
+    background: rgb(var(--c-surface-raised));
+    color: rgb(var(--c-content));
+  }
+  .watch-mobile-sections a:last-child {
+    color: rgb(var(--c-accent));
+    flex: 1;
+  }
+}
+@media (min-width: 1024px) {
+  .watch-page:not(.is-theater) .watch-episode-grid {
+    max-height: 240px;
+  }
+  .watch-page:not(.is-theater) .watch-recommendation-grid {
+    max-height: 520px;
+    overflow-y: auto;
+    padding: 2px;
+    scrollbar-width: thin;
+  }
+}

@@ -27,3 +27,5 @@
 - [密码恢复运维指南](operations/password-recovery.md)
 
 - [005 · 默认点播源扩充与逐源实测](iterations/005-vod-sources/README.md)
+
+- [006 · 播放页推荐与移动端适配](iterations/006-watch-recommendations/README.md)

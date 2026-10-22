@@ -21,6 +21,7 @@ import { enqueueDownload } from '@/components/download-manager';
 import { Icon } from '@/components/icon';
 import { ThemeToggle } from '@/components/theme';
 import { Brand } from '@/components/brand';
+import { WatchRecommendations } from '@/components/watch-recommendations';
 import { useAuth } from '@/components/auth';
 import { resolveSource, useAppStore } from '@/lib/store';
 import { qualityKey } from '@/lib/quality';
@@ -359,80 +360,96 @@ function WatchContent() {
           </div>
 
           {/* 剧集侧栏 */}
-          <aside className="watch-episodes bg-surface-raised">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <h2 className="text-sm font-semibold text-content">
-                剧集列表{episodes.length > 0 && `（${episodes.length}）`}
-              </h2>
-              {/* 排列开关紧贴它所作用的列表：放在这里才看得出它管的是这一栏的顺序 */}
-              {episodes.length > 1 && (
-                <button
-                  className="btn-ghost btn-sm shrink-0"
-                  onClick={() => setReversed((v) => !v)}
-                  aria-label={reversed ? '切换为正序排列' : '切换为倒序排列'}
-                  title="调整剧集列表的排列顺序"
-                >
-                  <Icon
-                    name="arrowDown"
-                    className={cn('w-3.5 h-3.5 transition-transform', reversed && 'rotate-180')}
-                  />
-                  {reversed ? '正序排列' : '倒序排列'}
-                </button>
-              )}
-            </div>
-            <div className="watch-source-card">
-              <span className="eyebrow">当前片源</span>
-              <strong>{source.name}</strong>
-              <button className="btn-ghost btn-sm" onClick={() => setSwitchOpen(true)}>
-                更换片源
-              </button>
-            </div>
-            {episodes.length > 40 && (
-              <div className="episode-groups" aria-label="选集分组">
-                {Array.from({ length: Math.ceil(episodes.length / 40) }, (_, group) => (
+          <aside className="watch-sidebar">
+            <nav className="watch-mobile-sections" aria-label="播放页内容">
+              <a href="#watch-episodes">选集</a>
+              <a href="#watch-recommendations">发现更多影片 ↓</a>
+            </nav>
+            <section
+              id="watch-episodes"
+              className="watch-episodes bg-surface-raised"
+              aria-label="当前影片选集"
+            >
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <h2 className="text-sm font-semibold text-content">
+                  剧集列表{episodes.length > 0 && `（${episodes.length}）`}
+                </h2>
+                {/* 排列开关紧贴它所作用的列表：放在这里才看得出它管的是这一栏的顺序 */}
+                {episodes.length > 1 && (
                   <button
-                    key={group}
-                    className={cn('btn-ghost btn-sm', activeGroup === group && 'episode-active')}
-                    aria-pressed={activeGroup === group}
-                    onClick={() => setEpisodeGroup(group)}
+                    className="btn-ghost btn-sm shrink-0"
+                    onClick={() => setReversed((v) => !v)}
+                    aria-label={reversed ? '切换为正序排列' : '切换为倒序排列'}
+                    title="调整剧集列表的排列顺序"
                   >
-                    {group * 40 + 1}–{Math.min(episodes.length, (group + 1) * 40)}
+                    <Icon
+                      name="arrowDown"
+                      className={cn('w-3.5 h-3.5 transition-transform', reversed && 'rotate-180')}
+                    />
+                    {reversed ? '正序排列' : '倒序排列'}
                   </button>
-                ))}
+                )}
               </div>
-            )}
-            {episodes.length === 0 ? (
-              detailQuery.isLoading ? (
-                <LoadingState />
-              ) : (
-                <EmptyState
-                  variant="plain"
-                  title={detailQuery.isError ? '获取剧集失败' : '暂无剧集信息'}
-                />
-              )
-            ) : (
-              <div className="watch-episode-grid scrollbar-thin">
-                {orderedEpisodes.map((realIndex) => (
-                  <EpisodeButton
-                    key={realIndex}
-                    index={realIndex}
-                    active={realIndex === currentIndex}
-                    onClick={() => goEpisode(realIndex)}
-                  />
-                ))}
-              </div>
-            )}
-            <p className="watch-shortcuts text-xs text-faint mt-3 leading-relaxed">
-              快捷键：空格 播放/暂停 · ←/→ 快退/快进 5s · ↑/↓ 音量 · F 全屏 · Alt+←/→ 切换集数
-            </p>
-            {!user && (
-              <div className="watch-guest-note">
-                <p>游客模式 · 不保存观看历史与进度</p>
-                <button className="btn-ghost btn-sm" onClick={openLogin}>
-                  登录开启记录
+              <div className="watch-source-card">
+                <span className="eyebrow">当前片源</span>
+                <strong>{source.name}</strong>
+                <button className="btn-ghost btn-sm" onClick={() => setSwitchOpen(true)}>
+                  更换片源
                 </button>
               </div>
-            )}
+              {episodes.length > 40 && (
+                <div className="episode-groups" aria-label="选集分组">
+                  {Array.from({ length: Math.ceil(episodes.length / 40) }, (_, group) => (
+                    <button
+                      key={group}
+                      className={cn('btn-ghost btn-sm', activeGroup === group && 'episode-active')}
+                      aria-pressed={activeGroup === group}
+                      onClick={() => setEpisodeGroup(group)}
+                    >
+                      {group * 40 + 1}–{Math.min(episodes.length, (group + 1) * 40)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {episodes.length === 0 ? (
+                detailQuery.isLoading ? (
+                  <LoadingState />
+                ) : (
+                  <EmptyState
+                    variant="plain"
+                    title={detailQuery.isError ? '获取剧集失败' : '暂无剧集信息'}
+                  />
+                )
+              ) : (
+                <div className="watch-episode-grid scrollbar-thin">
+                  {orderedEpisodes.map((realIndex) => (
+                    <EpisodeButton
+                      key={realIndex}
+                      index={realIndex}
+                      active={realIndex === currentIndex}
+                      onClick={() => goEpisode(realIndex)}
+                    />
+                  ))}
+                </div>
+              )}
+              <p className="watch-shortcuts text-xs text-faint mt-3 leading-relaxed">
+                快捷键：空格 播放/暂停 · ←/→ 快退/快进 5s · ↑/↓ 音量 · F 全屏 · Alt+←/→ 切换集数
+              </p>
+              {!user && (
+                <div className="watch-guest-note">
+                  <p>游客模式 · 不保存观看历史与进度</p>
+                  <button className="btn-ghost btn-sm" onClick={openLogin}>
+                    登录开启记录
+                  </button>
+                </div>
+              )}
+            </section>
+            <WatchRecommendations
+              key={`${sourceKey}:${vodId}`}
+              info={detailQuery.data?.videoInfo}
+              title={videoTitle}
+              ready={verified && (!vodId || !detailQuery.isPending)}
+            />
           </aside>
         </div>
       </main>
