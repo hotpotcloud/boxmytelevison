@@ -56,6 +56,8 @@ jobs:
           cp deploy/server.env .next/standalone/.env
           cp deploy/start.cjs .next/standalone/start.cjs
           cp deploy/verify-accounts.cjs .next/standalone/verify-accounts.cjs
+          cp deploy/install-runtime-deps.cjs .next/standalone/install-runtime-deps.cjs
+          cp package-lock.json .next/standalone/package-lock.json
           cp deploy/start.sh .next/standalone/start.sh
           # Send only the version and official checksum; Node itself is downloaded on the server.
           node --version > .next/standalone/.node-version
@@ -68,7 +70,8 @@ jobs:
           # JSON preserves special characters without interpreting the password as shell code.
           node -e 'require("fs").writeFileSync(".next/standalone/password.json", JSON.stringify({password: process.env.APP_PASSWORD, adminUsername: "xbf", adminPassword: process.env.BOOTSTRAP_ADMIN_PASSWORD}), {mode: 0o600})'
           rm -rf .next/standalone/data
-          tar -czf app.tar.gz -C .next/standalone .
+          tar --exclude='./node_modules' -czf app.tar.gz -C .next/standalone .
+          echo "Application package: $(stat -c%s app.tar.gz) bytes (runtime dependencies installed on server)"
           sha256sum app.tar.gz > app.tar.gz.sha256
           # The package contains a secret: transfer it only over SSH, never publish it.
 

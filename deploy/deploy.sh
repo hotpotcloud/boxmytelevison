@@ -57,6 +57,7 @@ if [ -f "$DATABASE_PATH" ]; then
   chmod 600 "$backup_db"
   echo 'Consistent database backup completed'
 fi
+"$node_bin" "$release/install-runtime-deps.cjs" "$app_dir" "$release"
 chmod 600 "$release/.env" "$release/password.json"
 test -f "$release/server.js"
 test -f "$release/start.cjs"
