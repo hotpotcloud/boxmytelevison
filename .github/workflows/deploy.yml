@@ -94,6 +94,7 @@ jobs:
             host_check=accept-new
           fi
           opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o StrictHostKeyChecking="$host_check")
+          rsync_ssh="ssh -i $HOME/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o StrictHostKeyChecking=$host_check"
           target="${SSH_USER}@${SSH_HOST}"
           stage="/tmp/boxmytelevison-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           cleanup() {
@@ -102,11 +103,12 @@ jobs:
           }
           trap cleanup EXIT
           # Check runtime and permissions before spending time uploading.
-          ssh "${opts[@]}" "$target" 'set -e; test "$(uname -m)" = x86_64 || { echo "This build requires an x86_64 server"; exit 1; }; command -v curl; command -v sha256sum; command -v tar; command -v xz; command -v systemctl; if [ "$(id -u)" != 0 ]; then sudo -n true; fi'
+          ssh "${opts[@]}" "$target" 'set -e; test "$(uname -m)" = x86_64 || { echo "This build requires an x86_64 server"; exit 1; }; command -v curl; command -v sha256sum; command -v tar; command -v xz; command -v rsync; command -v systemctl; if [ "$(id -u)" != 0 ]; then sudo -n true; fi'
           ssh "${opts[@]}" "$target" "umask 077; mkdir -p '$stage'"
           uploaded=0
           for attempt in 1 2 3; do
-            if timeout 15m scp "${opts[@]}" app.tar.gz app.tar.gz.sha256 deploy/deploy.sh "$target:$stage/"; then
+            if timeout 15m rsync --partial --append-verify --timeout=60 --info=progress2 \
+              -e "$rsync_ssh" app.tar.gz app.tar.gz.sha256 deploy/deploy.sh "$target:$stage/"; then
               uploaded=1
               break
             fi
