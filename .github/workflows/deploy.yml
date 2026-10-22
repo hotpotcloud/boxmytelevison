@@ -31,6 +31,10 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # 开启 Next.js standalone 输出（默认仅 Docker 构建时启用）
+          DOCKER_BUILD: "1"
+          NEXT_TELEMETRY_DISABLED: "1"
 
       - name: Package standalone
         run: |
