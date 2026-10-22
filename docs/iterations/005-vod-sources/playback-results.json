@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-10-22T12:02:43.706Z",
+  "server": "http://119.29.189.103:8080",
+  "mode": "existing watch page through the application media proxy",
+  "prefetchEnabled": false,
+  "results": [
+    {
+      "name": "暴风资源",
+      "url": "https://bfzyapi.com/api.php/provide/vod",
+      "passed": true,
+      "currentTime": 2.008396,
+      "width": 1280,
+      "height": 504,
+      "elapsedMs": 8409,
+      "pageErrors": []
+    },
+    {
+      "name": "红牛资源",
+      "url": "https://www.hongniuzy2.com/api.php/provide/vod",
+      "passed": true,
+      "currentTime": 2.017135,
+      "width": 1280,
+      "height": 506,
+      "elapsedMs": 8752,
+      "pageErrors": []
+    },
+    {
+      "name": "吉吉资源",
+      "url": "https://caiji.jjzyapi.com/api.php/provide/vod",
+      "passed": true,
+      "currentTime": 2.008023,
+      "width": 1920,
+      "height": 752,
+      "elapsedMs": 12117,
+      "pageErrors": []
+    },
+    {
+      "name": "魔都资源",
+      "url": "https://www.mdzyapi.com/api.php/provide/vod",
+      "passed": true,
+      "currentTime": 2.011247,
+      "width": 1920,
+      "height": 756,
+      "elapsedMs": 11117,
+      "pageErrors": []
+    },
+    {
+      "name": "光速资源",
+      "url": "https://api.guangsuapi.com/api.php/provide/vod",
+      "passed": true,
+      "currentTime": 2.016896,
+      "width": 1280,
+      "height": 506,
+      "elapsedMs": 15419,
+      "pageErrors": []
+    }
+  ]
+}

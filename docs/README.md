@@ -25,3 +25,5 @@
 
 - [004 · 忘记密码恢复](iterations/004-password-recovery/README.md)
 - [密码恢复运维指南](operations/password-recovery.md)
+
+- [005 · 默认点播源扩充与逐源实测](iterations/005-vod-sources/README.md)
