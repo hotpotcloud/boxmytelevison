@@ -22,3 +22,6 @@
 - [本地验收记录与实际页面截图](design/verification/README.md)
 
 - [003 · 幕间 Muu：游客、播放页与账号源同步](iterations/003-muu/README.md)
+
+- [004 · 忘记密码恢复](iterations/004-password-recovery/README.md)
+- [密码恢复运维指南](operations/password-recovery.md)

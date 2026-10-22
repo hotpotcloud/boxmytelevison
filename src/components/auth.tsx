@@ -16,6 +16,7 @@ import { applyEnvPresets } from '@/lib/subscription-sync';
 import type { AccountUser, AuthStatusResponse } from '@/lib/types';
 import { useToast } from './toast';
 import { Icon } from './icon';
+import { PasswordRecoveryHelp } from './password-recovery-help';
 import { useAppStore } from '@/lib/store';
 
 interface AuthContextValue {
@@ -355,6 +356,7 @@ function LoginModal({
                         : '登录'}
                   <span aria-hidden="true">→</span>
                 </button>
+                {mode === 'login' && <PasswordRecoveryHelp />}
                 {mode === 'register' && (
                   <p className="account-footnote">
                     邮箱仅用于登录，暂不支持邮件找回密码，请妥善保存密码。

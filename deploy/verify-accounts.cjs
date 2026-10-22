@@ -31,7 +31,7 @@ async function request(endpoint, options = {}) {
       .find((value) => /^ltv_account=[a-f0-9]{64}/.test(value));
     if (!cookieHeader || !cookieHeader.includes('HttpOnly') || !cookieHeader.includes('Max-Age='))
       throw new Error('Persistent session cookie is missing');
-    const cookie = cookieHeader.split(';')[0];
+    let cookie = cookieHeader.split(';')[0];
     const me = await request('/api/account/me', { headers: { cookie } });
     if (!me.ok || (await me.json()).user.id !== userId)
       throw new Error('Account session lookup failed');
@@ -58,6 +58,38 @@ async function request(endpoint, options = {}) {
     if (staleWrite.status !== 409) throw new Error('Account source conflict was not detected');
     if ((await request('/api/account/sources')).status !== 401)
       throw new Error('Anonymous account sources accepted');
+    // Exercise recovery only against this uniquely generated disposable account.
+    const resetPassword = randomBytes(24).toString('hex');
+    require('./reset-password.cjs').resetAccountPassword({
+      databasePath: process.env.DATABASE_PATH,
+      identifier: email,
+      password: resetPassword,
+    });
+    if ((await request('/api/account/me', { headers: { cookie } })).status !== 401)
+      throw new Error('Recovery did not revoke the previous session');
+    const oldLogin = await request('/api/account/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: email, password }),
+    });
+    if (oldLogin.status !== 401) throw new Error('Recovery accepted the old password');
+    const recovered = await request('/api/account/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: email, password: resetPassword }),
+    });
+    if (!recovered.ok) throw new Error('Recovered password login failed');
+    const recoveredCookie = recovered.headers
+      .getSetCookie()
+      .find((value) => /^ltv_account=[a-f0-9]{64}/.test(value));
+    if (!recoveredCookie) throw new Error('Recovered session cookie is missing');
+    cookie = recoveredCookie.split(';')[0];
+    const preserved = await (await request('/api/account/sources', { headers: { cookie } })).json();
+    if (preserved.config.customAPIs[0]?.key !== 'deploy_check')
+      throw new Error('Recovery changed the account source profile');
+    console.log(
+      'Password recovery check passed: new login, old password rejected, sessions revoked, sources preserved',
+    );
     const logout = await request('/api/auth', { method: 'DELETE', headers: { cookie } });
     if (!logout.ok) throw new Error('Session logout failed');
     const replay = await request('/api/account/me', { headers: { cookie } });

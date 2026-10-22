@@ -1696,3 +1696,5 @@ select:focus-visible {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.account-recovery { margin-top:16px; font-size:12px; color:rgb(var(--c-muted)); line-height:1.8; } .account-recovery summary { cursor:pointer; color:rgb(var(--c-accent)); min-height:44px; display:flex; align-items:center; font-size:13px; } .account-recovery p { margin:8px 0; } .account-recovery a { color:rgb(var(--c-accent)); display:inline-flex; align-items:center; min-height:44px; text-decoration:underline; text-underline-offset:3px; }

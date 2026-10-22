@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Header } from '@/components/header';
 import { accountRequest, useAuth } from '@/components/auth';
 import { Icon } from '@/components/icon';
+import { PasswordRecoveryHelp } from '@/components/password-recovery-help';
 import { useToast } from '@/components/toast';
 
 export default function AccountPage() {
@@ -90,7 +91,7 @@ export default function AccountPage() {
                 退出当前账号
               </button>
               <p className="account-footnote mt-4">
-                观看历史、收藏和源设置目前保存在当前浏览器中，暂不支持跨设备同步。
+                观看历史和收藏保存在当前浏览器；个人源设置随账号同步，可在其他设备恢复。
               </p>
             </section>
             <section className="account-panel">
@@ -144,6 +145,7 @@ export default function AccountPage() {
                   <span aria-hidden="true">→</span>
                 </button>
               </form>
+              <PasswordRecoveryHelp />
             </section>
           </div>
         )}
