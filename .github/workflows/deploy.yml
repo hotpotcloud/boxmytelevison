@@ -11,8 +11,12 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+permissions:
+  contents: write   # 允许创建/更新滚动 Release 产物
+
 env:
   APP_DIR: /opt/boxmytelevison
+  DIST_TAG: dist
 
 jobs:
   build-and-deploy:
@@ -32,7 +36,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # 开启 Next.js standalone 输出（默认仅 Docker 构建时启用）
           DOCKER_BUILD: "1"
           NEXT_TELEMETRY_DISABLED: "1"
 
@@ -42,46 +45,54 @@ jobs:
           cp -r public .next/standalone/public
           tar -czf app.tar.gz -C .next/standalone .
 
-      - name: Copy files to server
-        uses: appleboy/scp-action@v0.1.7
+      - name: Publish rolling release
+        uses: ncipollo/release-action@v1
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          source: "app.tar.gz,deploy/server.env,deploy/start.sh"
-          target: /tmp/deploy
-          strip_components: 1
+          tag: ${{ env.DIST_TAG }}
+          name: Rolling build
+          artifacts: app.tar.gz
+          allowUpdates: true
+          replacesArtifacts: true
+          removeArtifacts: true
+          prerelease: false
 
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.2.0
         env:
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
           APP_DIR: ${{ env.APP_DIR }}
+          DIST_TAG: ${{ env.DIST_TAG }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
-          envs: APP_PASSWORD,APP_DIR
+          envs: APP_PASSWORD,APP_DIR,DIST_TAG
           script: |
             set -e
-            cd /tmp/deploy
-            mkdir -p "$APP_DIR"
+            BASE="https://raw.githubusercontent.com/hotpotcloud/boxmytelevison/main/deploy"
+            REL="https://github.com/hotpotcloud/boxmytelevison/releases/download/${DIST_TAG}/app.tar.gz"
 
-            # 1) 解压新版本（覆盖代码，保留 .env 由下一步重建）
+            mkdir -p "$APP_DIR"
+            cd /tmp
+
+            # 1) 服务器直接从 GitHub 下载构建产物（避开跨境 SSH 上传）
+            curl -fsSL --retry 3 -o app.tar.gz "$REL"
+            curl -fsSL --retry 3 -o server.env "$BASE/server.env"
+            curl -fsSL --retry 3 -o start.sh "$BASE/start.sh"
+
+            # 2) 解压新版本
             tar -xzf app.tar.gz -C "$APP_DIR"
 
-            # 2) 生成应用配置（预置源 + 访问密码）
+            # 3) 生成应用配置（预置源 + 访问密码）
             cp server.env "$APP_DIR/.env"
             echo "PASSWORD=${APP_PASSWORD}" >> "$APP_DIR/.env"
 
-            # 3) 启动脚本（加载 .env 后 exec node）
+            # 4) 启动脚本
             cp start.sh "$APP_DIR/start.sh"
             chmod +x "$APP_DIR/start.sh"
 
-            # 4) 注册 systemd 服务（首次），随后重启
-            NODE_BIN=$(command -v node)
+            # 5) 注册 systemd 服务（首次），随后重启
             cat > /etc/systemd/system/boxmytelevison.service <<EOF
             [Unit]
             Description=BoxMyTelevision
