@@ -43,6 +43,9 @@ jobs:
         run: |
           cp -r .next/static .next/standalone/.next/static
           cp -r public .next/standalone/public
+          # 把部署所需的配置/启动脚本一并打进 tarball，服务器只需下载一个文件
+          cp deploy/server.env .next/standalone/_server.env
+          cp deploy/start.sh .next/standalone/_start.sh
           tar -czf app.tar.gz -C .next/standalone .
 
       - name: Publish rolling release
@@ -70,27 +73,25 @@ jobs:
           envs: APP_PASSWORD,APP_DIR,DIST_TAG
           script: |
             set -e
-            BASE="https://raw.githubusercontent.com/hotpotcloud/boxmytelevison/main/deploy"
             REL="https://github.com/hotpotcloud/boxmytelevison/releases/download/${DIST_TAG}/app.tar.gz"
 
             mkdir -p "$APP_DIR"
             cd /tmp
 
-            # 1) 服务器直接从 GitHub 下载构建产物（避开跨境 SSH 上传）
+            # 1) 服务器直接从 GitHub 下载构建产物（含应用、配置、启动脚本）
             curl -fsSL --retry 3 -o app.tar.gz "$REL"
-            curl -fsSL --retry 3 -o server.env "$BASE/server.env"
-            curl -fsSL --retry 3 -o start.sh "$BASE/start.sh"
 
-            # 2) 解压新版本
+            # 2) 解压新版本（覆盖应用代码）
             tar -xzf app.tar.gz -C "$APP_DIR"
 
             # 3) 生成应用配置（预置源 + 访问密码）
-            cp server.env "$APP_DIR/.env"
+            cp "$APP_DIR/_server.env" "$APP_DIR/.env"
             echo "PASSWORD=${APP_PASSWORD}" >> "$APP_DIR/.env"
 
             # 4) 启动脚本
-            cp start.sh "$APP_DIR/start.sh"
+            cp "$APP_DIR/_start.sh" "$APP_DIR/start.sh"
             chmod +x "$APP_DIR/start.sh"
+            rm -f "$APP_DIR/_server.env" "$APP_DIR/_start.sh"
 
             # 5) 注册 systemd 服务（首次），随后重启
             cat > /etc/systemd/system/boxmytelevison.service <<EOF
