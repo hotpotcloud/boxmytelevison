@@ -1,7 +1,7 @@
 {
-  "checkedAt": "2026-10-22T13:00:54.384Z",
+  "checkedAt": "2026-10-22T13:07:55.492Z",
   "url": "http://119.29.189.103:8080/watch?source=env_10&id=170950&index=0&title=%E5%85%AB%E4%BB%99&sourceUrl=https%3A%2F%2Fapi.guangsuapi.com%2Fapi.php%2Fprovide%2Fvod",
-  "version": "2.21.4",
+  "version": "2.21.5",
   "titles": [
     "千与千寻",
     "哪吒之魔童降世",
@@ -20,6 +20,7 @@
     "逃出布迪秀",
     "巴黎绽放的星辰"
   ],
+  "mobileAutoMini": 0,
   "mobileOverflow": false,
   "mobileColumns": "167px 167px",
   "navigation": "http://119.29.189.103:8080/?s=%E7%94%9F%E5%8C%96%E5%8D%B1%E6%9C%BA%EF%BC%9A%E7%88%86%E5%8F%91%E5%A4%9C",

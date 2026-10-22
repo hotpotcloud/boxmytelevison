@@ -39,6 +39,9 @@
     "mobileRecommendationJump": true
   },
   {
+    "mobileAutoMini": 0
+  },
+  {
     "errorState": true,
     "episodeCount": 40
   },
