@@ -1,0 +1,14 @@
+{
+  "url": "http://119.29.189.103:8080",
+  "result": "passed",
+  "checks": [
+    "public browser administrator login",
+    "session preserved after page reload",
+    "real recommendation posters loaded",
+    "desktop light appearance",
+    "mobile common actions menu",
+    "375px no horizontal overflow",
+    "public account page and logout"
+  ],
+  "scriptErrors": []
+}

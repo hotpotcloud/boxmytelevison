@@ -1,0 +1,40 @@
+{
+  "version": "2.20.0",
+  "registrationMode": "open",
+  "pagesAndAssets": [
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/_next/static/css/54b023a9c7aaba46.css",
+      "status": 200
+    },
+    {
+      "path": "/_next/static/chunks/webpack-76e8f6a1c7365c16.js",
+      "status": 200
+    },
+    {
+      "path": "/_next/static/chunks/4bd1b696-f6bedae49f0827a5.js",
+      "status": 200
+    },
+    {
+      "path": "/live",
+      "status": 200
+    },
+    {
+      "path": "/account",
+      "status": 200
+    },
+    {
+      "path": "/favorites",
+      "status": 200
+    }
+  ],
+  "adminLogin": "passed",
+  "administrator": "xbf",
+  "persistentCookie": "passed",
+  "authenticatedWithoutAccessPassword": "passed",
+  "logoutAndReplayRejection": "passed",
+  "unauthenticatedApiGuard": "passed"
+}
