@@ -52,4 +52,11 @@
 - CI [39764919412](https://github.com/hotpotcloud/boxmytelevison/actions/runs/39764919412) 成功，个人源持久化、版本冲突和退出后会话拒绝的服务器集成验收通过，临时账号已清理。
 - 服务器安装 89 个生产依赖用时 9 秒，继续小包上传，无 Docker。
 - 默认 6 个点播源、5 个直播源；匿名搜索返回 29 条结果、无失败源；首页 141 条、每页 24；匿名实际播放输出 720p，历史/进度/搜索/收藏全为 0，无页面异常。
-- [公网结果](verification/production-results.json)；补丁部署结果见后续记录。
+- [2.21.0 公网结果](verification/production-2.21.0-results.json)。
+
+## 最终上线（2.21.1）
+- 提交 8928fd73f4bfbdfde1a5e4398ec2bacb73664ad4，CI [39768034588](https://github.com/hotpotcloud/boxmytelevison/actions/runs/39768034588) 成功。
+- 496 项测试、类型检查、Lint、生产构建通过。服务器生产依赖安装 8 秒，账号与个人源集成检查通过，临时验收账号已清理。
+- 公网游客搜索 29 条、6 个源无失败；真实视频播放超过 2 秒、输出 1280×720；游客四类记录均为零；桌面、390px 手机无横向溢出，无页面错误。
+- 最终截图采集时片单先返回 56 部周榜，热门内容按上游可用性继续补入；此前采集 141 部。数量动态变化，界面始终展示实际去重条数。
+- [最终公网验收 JSON](verification/production-results.json) · [桌面首页](verification/production-home-desktop.png) · [桌面播放](verification/production-watch-desktop.png) · [手机播放](verification/production-watch-mobile.png)。

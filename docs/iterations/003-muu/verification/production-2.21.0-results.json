@@ -1,0 +1,28 @@
+{
+  "version": "2.21.0",
+  "defaultVodSources": 6,
+  "defaultLiveSources": 5,
+  "guestSearch": {
+    "status": 200,
+    "results": 29,
+    "failedSources": 0
+  },
+  "accountProtection": true,
+  "guestHome": {
+    "posters": 24,
+    "pagination": "共 141 部 · 第 1 / 6 页",
+    "noLoginWall": true
+  },
+  "guestPlayback": {
+    "currentTime": 2.025244,
+    "width": 1280,
+    "height": 720
+  },
+  "guestStorage": {
+    "history": 0,
+    "progress": 0,
+    "searchHistory": 0,
+    "favorites": 0
+  },
+  "pageErrors": []
+}

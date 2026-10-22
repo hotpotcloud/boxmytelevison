@@ -1,5 +1,5 @@
 {
-  "version": "2.21.0",
+  "version": "2.21.1",
   "defaultVodSources": 6,
   "defaultLiveSources": 5,
   "guestSearch": {
@@ -10,11 +10,11 @@
   "accountProtection": true,
   "guestHome": {
     "posters": 24,
-    "pagination": "共 141 部 · 第 1 / 6 页",
+    "pagination": "共 56 部 · 第 1 / 3 页",
     "noLoginWall": true
   },
   "guestPlayback": {
-    "currentTime": 2.025244,
+    "currentTime": 2.024669,
     "width": 1280,
     "height": 720
   },
