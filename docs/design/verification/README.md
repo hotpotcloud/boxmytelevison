@@ -23,6 +23,7 @@
 - 设置和历史抽屉能打开与关闭；直播页面框架无脚本错误或横向溢出。
 - 手机“更多功能”菜单已补充并实测：历史、下载管理、源管理与设置、收藏均可访问，包含访客兼容入口。
 - 本轮检查中没有捕获页面脚本错误，没有发现横向溢出。
+- 亮色主按钮白字对比度为 5.19:1；侧栏辅助文字 4.88:1；暗色辅助文字 6.23:1，达到普通文本 AA 4.5:1。截图之后进一步加深了主蓝色与浅色辅助文字。
 
 截图：[桌面浅色](desktop-light.png)、[桌面深色](desktop-dark.png)、[手机浅色](mobile-light.png)、[手机深色](mobile-dark.png)、[手机登录](mobile-login.png)、[手机账号](mobile-account.png)。机器检查摘要：[browser-results.json](browser-results.json)。
 

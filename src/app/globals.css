@@ -78,8 +78,8 @@ body {
 
 body {
   font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 }
 
 @layer components {
@@ -239,7 +239,7 @@ body {
   --c-line: 224 227 234;
   --c-content: 29 31 36;
   --c-muted: 99 104 115;
-  --c-faint: 110 115 127;
+  --c-faint: 102 108 120;
   --c-accent: 0 102 230;
   --c-accent-hover: 0 86 199;
   --c-on-accent: 255 255 255;
@@ -264,8 +264,8 @@ body {
 }
 body {
   font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'PingFang SC', 'Segoe UI',
-    'Microsoft YaHei', sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 button,
 a,
@@ -316,9 +316,9 @@ select:focus-visible {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: #087aff;
+  background: #0066e6;
   color: white;
-  box-shadow: 0 3px 8px #087aff26;
+  box-shadow: 0 3px 8px #0066e626;
   flex-shrink: 0;
 }
 .brand-symbol svg {
@@ -364,9 +364,9 @@ select:focus-visible {
   color: rgb(var(--c-content));
 }
 .sidebar-link.is-active {
-  background: #087aff;
+  background: #0066e6;
   color: white;
-  box-shadow: 0 3px 8px #087aff18;
+  box-shadow: 0 3px 8px #0066e618;
 }
 .sidebar-bottom {
   margin-top: auto;
@@ -468,7 +468,7 @@ select:focus-visible {
   width: 29px;
   height: 29px;
   border-radius: 50%;
-  background: #087aff;
+  background: #0066e6;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -587,12 +587,13 @@ select:focus-visible {
   padding: 22px;
 }
 .featured-card::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(90deg, #08111bd9, #08111b30), linear-gradient(0deg, #08111b80, transparent);
+    linear-gradient(90deg, #08111bd9, #08111b30),
+    linear-gradient(0deg, #08111b80, transparent);
 }
 .featured-image {
   position: absolute;
@@ -647,7 +648,7 @@ select:focus-visible {
   font-size: 12px;
 }
 .featured-actions button:first-child {
-  background: #087aff;
+  background: #0066e6;
 }
 .featured-actions button:hover {
   filter: brightness(1.12);
@@ -699,8 +700,8 @@ select:focus-visible {
   white-space: nowrap;
   color: rgb(var(--c-muted));
 }
-.segmented-control [aria-pressed='true'],
-.segmented-control [aria-current='page'] {
+.segmented-control [aria-pressed="true"],
+.segmented-control [aria-current="page"] {
   background: rgb(var(--c-surface-raised));
   box-shadow: 0 1px 5px #0000000a;
   color: rgb(var(--c-content));
@@ -739,7 +740,7 @@ select:focus-visible {
 .library-tag:hover {
   background: rgb(var(--c-chip));
 }
-.library-tag[aria-pressed='true'] {
+.library-tag[aria-pressed="true"] {
   color: rgb(var(--c-accent));
   background: rgb(var(--c-accent) / 0.1);
   font-weight: 600;
@@ -825,10 +826,10 @@ select:focus-visible {
 .poster-save:hover {
   background: rgb(var(--c-chip));
 }
-.poster-save[aria-pressed='true'] {
+.poster-save[aria-pressed="true"] {
   color: rgb(var(--c-accent));
 }
-.poster-save[aria-pressed='true'] svg {
+.poster-save[aria-pressed="true"] svg {
   fill: rgb(var(--c-accent) / 0.2);
 }
 .pagination {
@@ -863,10 +864,10 @@ select:focus-visible {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.pagination-pages button[aria-current='page'] {
-  background: #087aff;
+.pagination-pages button[aria-current="page"] {
+  background: #0066e6;
   color: white;
-  border-color: #087aff;
+  border-color: #0066e6;
 }
 .pagination-pages button:not(:disabled):hover {
   border-color: rgb(var(--c-accent));
@@ -935,14 +936,14 @@ select:focus-visible {
 .account-mark {
   width: 52px;
   height: 52px;
-  background: #087aff;
+  background: #0066e6;
   color: white;
   border-radius: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 22px;
-  box-shadow: 0 5px 15px #087aff20;
+  box-shadow: 0 5px 15px #0066e620;
 }
 .account-mark svg {
   fill: currentColor;
@@ -973,7 +974,7 @@ select:focus-visible {
   color: rgb(var(--c-muted));
   font-size: 13px;
 }
-.account-segments button[aria-pressed='true'] {
+.account-segments button[aria-pressed="true"] {
   background: rgb(var(--c-surface-raised));
   color: rgb(var(--c-content));
   box-shadow: 0 1px 4px #0001;
@@ -1020,7 +1021,7 @@ select:focus-visible {
   cursor: pointer;
 }
 .account-options input {
-  accent-color: #087aff;
+  accent-color: #0066e6;
   width: 15px;
   height: 15px;
 }
@@ -1031,7 +1032,7 @@ select:focus-visible {
   width: 100%;
   min-height: 46px;
   border-radius: 10px;
-  background: #087aff;
+  background: #0066e6;
   color: white;
   padding: 12px 17px;
   font-size: 13px;
@@ -1205,7 +1206,7 @@ select:focus-visible {
     color: rgb(var(--c-muted));
     font-size: 10px;
   }
-  .mobile-tabbar a[aria-current='page'] {
+  .mobile-tabbar a[aria-current="page"] {
     color: rgb(var(--c-accent));
   }
   .app-content {
