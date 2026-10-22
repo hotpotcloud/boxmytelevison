@@ -18,6 +18,7 @@ import {
 import { useLiveProbe, type ProbeResult } from './use-live-probe';
 import type { LiveChannel } from '@/lib/types';
 import { EmptyState } from './states';
+import { GroupPicker } from './live-group-picker';
 
 /**
  * 直播频道侧栏：全部/收藏/最近三个视图 + 分组横向标签条 + 关键字搜索 + 排序。
@@ -69,7 +70,7 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debounced;
 }
 
-export function LiveChannelList({ channels, groups, currentUrl, onSelect, onFilteredChange }: ChannelListProps) {
+export function LiveChannelList({ channels, currentUrl, onSelect, onFilteredChange }: ChannelListProps) {
   // 精确订阅：避免任何 store 字段变化（尤其测活节流写回）引发本组件重渲染
   const liveFavorites = useAppStore((s) => s.liveFavorites);
   const liveRecent = useAppStore((s) => s.liveRecent);
@@ -106,6 +107,15 @@ export function LiveChannelList({ channels, groups, currentUrl, onSelect, onFilt
   const favSet = useMemo(() => new Set(liveFavorites), [liveFavorites]);
   const recentOrder = useMemo(() => new Map(liveRecent.map((r, i) => [r.url, i] as const)), [liveRecent]);
   const normalizedKeyword = useMemo(() => normalizeForSearch(debouncedKeyword.trim()), [debouncedKeyword]);
+  // 分组及其频道数量（供分组选择器按数量排序、显示数量）
+  const groupCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of channels) {
+      if (!c.group) continue;
+      map.set(c.group, (map.get(c.group) ?? 0) + 1);
+    }
+    return [...map.entries()].map(([name, count]) => ({ name, count }));
+  }, [channels]);
 
   // 先做视图/分组/搜索/排序（不含可用性筛选）：可用性计数必须基于这份列表，
   // 否则点击筛选后 filtered 收缩，两个计数会跟着变小、与实际展示对不上
@@ -237,7 +247,7 @@ export function LiveChannelList({ channels, groups, currentUrl, onSelect, onFilt
         ))}
       </div>
 
-      {/* 搜索 + 排序 */}
+      {/* 搜索 + 分组 + 排序 */}
       <div className="px-3 py-2 shrink-0 flex items-center gap-1.5">
         <input
           className="input w-full !py-1.5 text-xs"
@@ -255,6 +265,9 @@ export function LiveChannelList({ channels, groups, currentUrl, onSelect, onFilt
             }
           }}
         />
+        {view !== 'recent' && (
+          <GroupPicker groups={groupCounts} value={group} onChange={setGroup} />
+        )}
         <Dropdown
           className="shrink-0 [&>button]:!py-1.5 [&>button]:!px-2 [&>button]:text-xs"
           value={sortMode}
@@ -341,18 +354,6 @@ export function LiveChannelList({ channels, groups, currentUrl, onSelect, onFilt
         )}
       </div>
 
-      {/* 分组标签条（横向可滑动） */}
-      {view === 'all' && groups.length > 0 && (
-        <div className="px-3 pb-2 shrink-0">
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
-            <GroupChip active={!group} label="全部分组" onClick={() => setGroup('')} />
-            {groups.map((g) => (
-              <GroupChip key={g} active={group === g} label={g} onClick={() => setGroup(g === group ? '' : g)} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* 频道列表（容器可聚焦，↑↓/Enter 光标导航） */}
       <div
         ref={listRef}
@@ -412,22 +413,6 @@ export function LiveChannelList({ channels, groups, currentUrl, onSelect, onFilt
         )}
       </div>
     </div>
-  );
-}
-
-function GroupChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      className={cn(
-        'shrink-0 px-2.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors border',
-        active
-          ? 'bg-accent text-on-accent border-accent'
-          : 'bg-chip text-muted border-line hover:text-content hover:bg-hover'
-      )}
-      onClick={onClick}
-    >
-      {label}
-    </button>
   );
 }
 

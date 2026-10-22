@@ -188,3 +188,19 @@ body {
     min-width: 40px !important;
   }
 }
+
+/*
+ * 直播页播放器：按视口高度限宽，保持 16:9 并尽可能放大，
+ * 避免宽屏下播放器偏小、两侧和下方大量留白。
+ * 预留高度 = 顶栏 + 内边距 + 频道信息条（桌面约 180px）。
+ */
+.live-player-cap {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
+}
+@media (min-width: 1024px) {
+  .live-player-cap {
+    max-width: calc((100vh - 180px) * 16 / 9);
+  }
+}

@@ -52,6 +52,8 @@ function LiveContent() {
   const [copied, setCopied] = useState(false);
   // 移动端频道抽屉开合
   const [listOpen, setListOpen] = useState(false);
+  // 节目单折叠（默认收起，给播放器让出空间）
+  const [epgOpen, setEpgOpen] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   /** 侧栏上报的筛选排序结果（键盘换台沿此列表顺序）；ref 存储，不触发重渲染 */
   const filteredRef = useRef<LiveChannelItem[]>([]);
@@ -218,40 +220,44 @@ function LiveContent() {
   const isFavorite = currentChannel ? liveFavorites.includes(currentChannel.url) : false;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       <Header showSearch />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+      <main className="flex-1 min-h-0 w-full p-3 lg:p-4 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 lg:gap-4">
           {/* 主栏：播放器 + 信息条 + 节目单 */}
-          <div className="min-w-0">
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              {currentUrl ? (
-                <LivePlayer
-                  url={currentUrl}
-                  title={currentChannel?.name || '直播'}
-                  onPrevChannel={goPrevChannel}
-                  onNextChannel={goNextChannel}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black">
-                  <span className="live-dot" />
-                  <p className="text-white/60 text-sm">
-                    {sources.length === 0
-                      ? liveEnvSources.length + liveSubscriptions.length > 0
-                        ? '所有直播源均已停用，请在设置中勾选启用'
-                        : '请先在设置中添加直播源（M3U 订阅）'
-                      : playlistsQuery.isLoading
-                        ? '频道列表加载中...'
-                        : '从右侧选择一个频道开始观看'}
-                  </p>
-                </div>
-              )}
+          <div className="min-w-0 flex-1 flex flex-col min-h-0 lg:overflow-y-auto lg:scrollbar-thin">
+            <div className="live-player-cap shrink-0">
+              <div className="relative aspect-video w-full bg-black rounded-lg overflow-hidden">
+                {currentUrl ? (
+                  <LivePlayer
+                    url={currentUrl}
+                    title={currentChannel?.name || '直播'}
+                    onPrevChannel={goPrevChannel}
+                    onNextChannel={goNextChannel}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black">
+                    <span className="live-dot" />
+                    <p className="text-white/60 text-sm">
+                      {sources.length === 0
+                        ? liveEnvSources.length + liveSubscriptions.length > 0
+                          ? '所有直播源均已停用，请在设置中勾选启用'
+                          : '请先在设置中添加直播源（M3U 订阅）'
+                        : playlistsQuery.isLoading
+                          ? '频道列表加载中...'
+                          : '从右侧选择一个频道开始观看'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* 频道信息条 */}
+            {/* 信息条 + 节目单：与播放器等宽对齐 */}
+            <div className="live-player-cap shrink-0">
+            {/* 频道信息条（紧凑） */}
             {currentChannel && (
-              <div className="bg-surface-raised border border-line rounded-lg p-3 mt-3 flex items-center gap-3">
-                <div className="w-10 h-10 shrink-0 rounded bg-chip flex items-center justify-center overflow-hidden">
+              <div className="bg-surface-raised border border-line rounded-lg px-3 py-2 mt-2.5 flex items-center gap-2.5">
+                <div className="w-9 h-9 shrink-0 rounded bg-chip flex items-center justify-center overflow-hidden">
                   {logo && !logoFailed ? (
                     <SmartImage
                       url={logo}
@@ -265,17 +271,14 @@ function LiveContent() {
                     <span className="text-xs text-faint">{currentChannel.name.slice(0, 1)}</span>
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="live-dot shrink-0" />
-                    <h1 className="text-sm font-semibold text-content truncate">{currentChannel.name}</h1>
-                    {currentChannel.group && (
-                      <span className="tag bg-chip text-faint shrink-0">{currentChannel.group}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-faint truncate mt-0.5">{currentChannel.url}</p>
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <span className="live-dot shrink-0" />
+                  <h1 className="text-sm font-semibold text-content truncate">{currentChannel.name}</h1>
+                  {currentChannel.group && (
+                    <span className="tag bg-chip text-faint shrink-0">{currentChannel.group}</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-0.5 shrink-0">
                   <button
                     className={cn(
                       'rounded-md p-2 transition-colors',
@@ -378,13 +381,33 @@ function LiveContent() {
               </div>
             )}
 
-            {/* 节目单 */}
+            {/* 节目单（可折叠，默认收起） */}
             {currentChannel && (
-              <section className="bg-surface-raised border border-line rounded-lg p-3 mt-3">
-                <h2 className="text-sm font-semibold text-content mb-2.5">节目单</h2>
-                <LiveEpgPanel epgUrl={currentChannel.epg} tvgId={currentChannel.tvgId} />
+              <section className="bg-surface-raised border border-line rounded-lg mt-2.5 overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-hover transition-colors"
+                  onClick={() => setEpgOpen((v) => !v)}
+                  aria-expanded={epgOpen}
+                >
+                  <h2 className="text-sm font-semibold text-content">节目单</h2>
+                  <svg
+                    className={cn('w-4 h-4 text-muted transition-transform duration-200', epgOpen && 'rotate-180')}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {epgOpen && (
+                  <div className="px-3 pb-3">
+                    <LiveEpgPanel epgUrl={currentChannel.epg} tvgId={currentChannel.tvgId} />
+                  </div>
+                )}
               </section>
             )}
+            </div>
           </div>
 
           {/* 移动端抽屉遮罩 */}
@@ -396,13 +419,13 @@ function LiveContent() {
             />
           )}
 
-          {/* 侧栏：桌面常驻 sticky；移动端底部抽屉 */}
+          {/* 侧栏：桌面常驻、与播放器等高；移动端底部抽屉 */}
           <aside
             className={cn(
               'bg-surface-raised border border-line flex-col overflow-hidden',
               'fixed inset-x-0 bottom-0 z-40 h-[75vh] rounded-t-2xl shadow-2xl',
               listOpen ? 'flex' : 'hidden',
-              'lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-6.5rem)] lg:rounded-xl lg:shadow-none'
+              'lg:relative lg:z-auto lg:w-[340px] lg:shrink-0 lg:h-auto lg:flex lg:rounded-xl lg:shadow-none'
             )}
           >
             {/* 抽屉把手栏（仅移动端） */}
