@@ -79,7 +79,16 @@ jobs:
             cd /tmp
 
             # 1) 服务器直接从 GitHub 下载构建产物（含应用、配置、启动脚本）
-            curl -fsSL --retry 3 -o app.tar.gz "$REL"
+            #    跨境 CDN 易断流，采用"断点续传 + gzip 完整性校验"循环，直到拿到完整文件
+            rm -f app.tar.gz
+            ok=0
+            for i in $(seq 1 8); do
+              curl -fSL --retry 3 --retry-all-errors --continue-at - -o app.tar.gz "$REL" || true
+              if gzip -t app.tar.gz 2>/dev/null; then ok=1; break; fi
+              echo "第 $i 次下载不完整（$(stat -c%s app.tar.gz 2>/dev/null || echo 0) 字节），断点续传重试..."
+            done
+            if [ "$ok" -ne 1 ]; then echo "构建产物下载失败/损坏"; exit 1; fi
+            echo "下载完成：$(stat -c%s app.tar.gz) 字节"
 
             # 2) 解压新版本（覆盖应用代码）
             tar -xzf app.tar.gz -C "$APP_DIR"
