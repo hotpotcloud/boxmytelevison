@@ -2,16 +2,13 @@
 set -euo pipefail
 stage=$1
 app_dir=$2
-node_bin=${3:-$(command -v node)}
 if [ "$(id -u)" != 0 ]; then
-  # Pass the discovered Node path explicitly (including installations outside /usr/bin).
-  exec sudo -n bash "$0" "$stage" "$app_dir" "$node_bin"
+  exec sudo -n bash "$0" "$stage" "$app_dir"
 fi
 
 cd "$stage"
 sha256sum -c app.tar.gz.sha256
 gzip -t app.tar.gz
-"$node_bin" -e 'if (Number(process.versions.node.split(".")[0]) < 22) process.exit(1)'
 case "$(uname -m)" in
   x86_64) ;;
   *) echo 'This build requires an x86_64 server'; exit 1 ;;
@@ -21,6 +18,9 @@ esac
 release="$app_dir/releases/$(basename "$stage")"
 install -d -m 700 "$release"
 tar -xzf app.tar.gz -C "$release"
+node_bin="$release/_node"
+chmod 700 "$node_bin"
+"$node_bin" --version
 chmod 600 "$release/.env" "$release/password.json"
 test -f "$release/server.js"
 test -f "$release/start.cjs"
