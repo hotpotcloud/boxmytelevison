@@ -357,7 +357,7 @@ export function PlayerShell({
       volume: 0.8,
       autoplay: true,
       pip: true,
-      autoMini: true,
+      autoMini: window.matchMedia('(min-width: 1024px)').matches,
       screenshot: true,
       setting: true,
       playbackRate: true,
@@ -403,6 +403,13 @@ export function PlayerShell({
       },
     });
     artRef.current = art;
+    // 小屏浏览选集和推荐时，自动小窗会遮挡触控内容。
+    const miniViewport = window.matchMedia('(min-width: 1024px)');
+    const syncAutoMini = () => {
+      art.option.autoMini = miniViewport.matches;
+      if (!miniViewport.matches) art.mini = false;
+    };
+    miniViewport.addEventListener('change', syncAutoMini);
 
     /**
      * 读解码后的真实分辨率。
@@ -620,6 +627,7 @@ export function PlayerShell({
       hlsRef.current = null;
       recoveryRef.current?.dispose();
       getVideoPrefetcher().stop();
+      miniViewport.removeEventListener('change', syncAutoMini);
       art.destroy();
       artRef.current = null;
     };
@@ -696,3 +704,4 @@ export function PlayerShell({
     </div>
   );
 }
+
