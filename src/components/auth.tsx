@@ -59,6 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSetupRequired(!s.passwordRequired);
         setVersion(s.version);
         setChecked(true);
+        // 直接访问任意页面（如 /live）时，可能没有其他请求触发 401，
+        // 这里在初始状态确认未验证后主动弹出登录框，避免停在"等待访问验证"。
+        if (!s.verified) {
+          setModalOpen(true);
+        }
       })
       .catch(() => {
         if (!cancelled) setChecked(true);
