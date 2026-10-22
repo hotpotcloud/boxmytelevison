@@ -21,6 +21,7 @@
 - 收藏新增、刷新保留、取消和空状态实测通过。
 - 邮箱注册、持久会话 Cookie、修改密码、旧 Cookie 重放拒绝、重新登录和退出实测通过。
 - 设置和历史抽屉能打开与关闭；直播页面框架无脚本错误或横向溢出。
+- 手机“更多功能”菜单已补充并实测：历史、下载管理、源管理与设置、收藏均可访问，包含访客兼容入口。
 - 本轮检查中没有捕获页面脚本错误，没有发现横向溢出。
 
 截图：[桌面浅色](desktop-light.png)、[桌面深色](desktop-dark.png)、[手机浅色](mobile-light.png)、[手机深色](mobile-dark.png)、[手机登录](mobile-login.png)、[手机账号](mobile-account.png)。机器检查摘要：[browser-results.json](browser-results.json)。

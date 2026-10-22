@@ -189,13 +189,35 @@ function HeaderContent({ showSearch }: { showSearch: boolean }) {
           </form>
           <div className="toolbar-actions">
             <ThemeToggle />
-            <button
-              className="toolbar-icon mobile-settings"
-              aria-label="源管理与设置"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <Icon name="gear" />
-            </button>
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <button className="toolbar-icon mobile-settings" aria-label="更多功能">
+                  <Icon name="gear" />
+                </button>
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Content className="app-menu" align="end" sideOffset={10}>
+                  <Menu.Label className="menu-label">常用功能</Menu.Label>
+                  <Menu.Item className="menu-item" onSelect={() => setHistoryOpen(true)}>
+                    <Icon name="clock" />
+                    观看历史
+                  </Menu.Item>
+                  <Menu.Item className="menu-item" onSelect={() => router.push('/favorites')}>
+                    <Icon name="heart" />
+                    我的收藏
+                  </Menu.Item>
+                  <Menu.Item className="menu-item" onSelect={requestShowDownloadManager}>
+                    <Icon name="download" />
+                    下载管理
+                  </Menu.Item>
+                  <Menu.Separator className="menu-separator" />
+                  <Menu.Item className="menu-item" onSelect={() => setSettingsOpen(true)}>
+                    <Icon name="gear" />
+                    源管理与设置
+                  </Menu.Item>
+                </Menu.Content>
+              </Menu.Portal>
+            </Menu.Root>
             {user ? (
               <Menu.Root>
                 <Menu.Trigger asChild>
