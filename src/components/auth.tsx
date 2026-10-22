@@ -16,6 +16,7 @@ import { applyEnvPresets } from '@/lib/subscription-sync';
 import type { AccountUser, AuthStatusResponse } from '@/lib/types';
 import { useToast } from './toast';
 import { Icon } from './icon';
+import { useAppStore } from '@/lib/store';
 
 interface AuthContextValue {
   checked: boolean;
@@ -66,10 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applyStatus = useCallback((status: AuthStatusResponse) => {
     setVerified(status.verified);
     setUser(status.user || null);
-    setSetupRequired(!status.passwordRequired);
+    setSetupRequired(false);
     setVersion(status.version);
     setRegistrationOpen(status.registrationMode !== 'closed');
-    setVisitorEnabled(status.visitorEnabled !== false);
+    setVisitorEnabled(false);
     setChecked(true);
   }, []);
 
@@ -80,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((status) => {
         if (cancelled) return;
         applyStatus(status);
-        if (!status.verified) setModalOpen(true);
+
       })
       .catch(() => {
         if (!cancelled) setChecked(true);
@@ -100,6 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  useEffect(() => {
+    const toggle = (event: Event) => {
+      if (!user) { setModalOpen(true); return; }
+      const url = (event as CustomEvent<string>).detail;
+      if (typeof url === 'string') useAppStore.getState().toggleLiveFavorite(url);
+    };
+    window.addEventListener('muu-toggle-live-favorite', toggle);
+    return () => window.removeEventListener('muu-toggle-live-favorite', toggle);
+  }, [user]);
   const openLogin = useCallback(() => setModalOpen(true), []);
   const logout = useCallback(async () => {
     await api.logout();
@@ -231,7 +241,7 @@ function LoginModal({
               ? '用常用邮箱注册，让好故事随时继续。'
               : mode === 'visitor'
                 ? '使用站点访问密码，临时进入观影空间。'
-                : '登录一次，下次打开即可继续观看。'}
+                : '自由观看无需登录；登录后可使用收藏、历史和个人源同步。'}
           </Dialog.Description>
           {setupRequired ? (
             <p className="account-notice">站点尚未完成初始化，请联系管理员。</p>

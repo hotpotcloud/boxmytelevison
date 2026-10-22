@@ -62,7 +62,7 @@ export function LivePlayer({ url, title, onPrevChannel, onNextChannel }: LivePla
   const [loading, setLoading] = useState(true);
   // 手动重试计数：变化时重建整个播放器实例（比 location.reload() 轻得多）
   const [retryNonce, setRetryNonce] = useState(0);
-  // 起播前的品牌占位图（与点播 player-shell 共用 /player-poster.png），实际开始播放后隐藏
+  // 起播前的品牌占位图（与点播 player-shell 共用 /muu-player-poster.svg），实际开始播放后隐藏
   const [showPoster, setShowPoster] = useState(true);
   // 换台 OSD：切台后短暂显示频道名（键盘换台/控制条换台时的视觉反馈，全屏内同样可见）
   const [osdTitle, setOsdTitle] = useState('');
@@ -388,7 +388,7 @@ export function LivePlayer({ url, title, onPrevChannel, onNextChannel }: LivePla
         <div
           className="absolute inset-0 bg-black pointer-events-none"
           style={{
-            backgroundImage: 'url(/player-poster.png)',
+            backgroundImage: 'url(/muu-player-poster.svg)',
             backgroundSize: 'contain',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',

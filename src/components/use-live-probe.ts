@@ -1,4 +1,5 @@
 'use client';
+import { useAuth } from './auth';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/client-api';
@@ -39,6 +40,8 @@ const MAX_TARGETS = 20_000;
 const FLUSH_INTERVAL_MS = 200;
 
 export function useLiveProbe() {
+  const auth = useAuth();
+  const authRef = useRef(auth); authRef.current = auth;
   const cache = useAppStore((s) => s.liveProbeResults);
   const [progress, setProgress] = useState<{ done: number; total: number; startedAt: number } | null>(null);
   const [hint, setHint] = useState('');
@@ -113,6 +116,7 @@ export function useLiveProbe() {
 
   const probe = useCallback(
     async (targets: { url: string }[]) => {
+      if (!authRef.current.user) { authRef.current.openLogin(); return; }
       const allUrls = [...new Set(targets.map((t) => t.url))];
       if (allUrls.length === 0) return;
       if (allUrls.length > MAX_TARGETS) {

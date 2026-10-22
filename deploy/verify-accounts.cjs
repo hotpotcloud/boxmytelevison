@@ -35,12 +35,35 @@ async function request(endpoint, options = {}) {
     const me = await request('/api/account/me', { headers: { cookie } });
     if (!me.ok || (await me.json()).user.id !== userId)
       throw new Error('Account session lookup failed');
+    const sources = await request('/api/account/sources', { headers: { cookie } });
+    if (!sources.ok) throw new Error('Account sources lookup failed');
+    const profile = await sources.json();
+    profile.config.customAPIs = [
+      { key: 'deploy_check', name: 'Deployment check', url: 'https://example.com/api' },
+    ];
+    const saveSources = await request('/api/account/sources', {
+      method: 'PUT',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: profile.config, revision: profile.revision }),
+    });
+    if (!saveSources.ok) throw new Error('Account sources persistence failed');
+    const restored = await (await request('/api/account/sources', { headers: { cookie } })).json();
+    if (restored.config.customAPIs[0]?.key !== 'deploy_check')
+      throw new Error('Account sources restore failed');
+    const staleWrite = await request('/api/account/sources', {
+      method: 'PUT',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: profile.config, revision: profile.revision }),
+    });
+    if (staleWrite.status !== 409) throw new Error('Account source conflict was not detected');
+    if ((await request('/api/account/sources')).status !== 401)
+      throw new Error('Anonymous account sources accepted');
     const logout = await request('/api/auth', { method: 'DELETE', headers: { cookie } });
     if (!logout.ok) throw new Error('Session logout failed');
     const replay = await request('/api/account/me', { headers: { cookie } });
     if (replay.status !== 401) throw new Error('Logged-out session was accepted');
     console.log(
-      'Account integration check passed: registration, persistent cookie, session lookup, logout and replay rejection',
+      'Account integration check passed: registration, persistent cookie, session lookup, source persistence, conflict detection, logout and replay rejection',
     );
   } finally {
     const db = new DatabaseSync(process.env.DATABASE_PATH);

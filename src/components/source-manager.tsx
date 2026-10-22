@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Drawer } from './drawer';
+import { SourceSyncStatus, useSourceSync } from './source-sync';
 import { ConfirmDialog } from './confirm-dialog';
 import { Icon, type IconName } from './icon';
 import { LiveSourceManager } from './live-source-manager';
@@ -64,6 +65,7 @@ const SECONDARY_TABS: Record<PrimaryTab, { id: SecondaryTab; label: string }[]> 
 const TAB_STORAGE_KEY = 'libretv-settings-tab';
 
 export function SourceManagerDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const sync = useSourceSync();
   const [primary, setPrimary] = useState<PrimaryTab>('sources');
   const [secondary, setSecondary] = useState<Record<PrimaryTab, SecondaryTab>>({
     sources: 'vod',
@@ -130,6 +132,8 @@ export function SourceManagerDrawer({ open, onClose }: { open: boolean; onClose:
         </div>
       }
     >
+      <SourceSyncStatus />
+      <fieldset disabled={sync.state === 'loading'} className="min-w-0">
       {current === 'vod' && <VodSourcesPanel />}
       {current === 'live' && <LiveSourceManager />}
       {current === 'playback' && <PlaybackPanel />}
@@ -137,6 +141,7 @@ export function SourceManagerDrawer({ open, onClose }: { open: boolean; onClose:
       {current === 'home' && <HomePanel />}
       {current === 'subs' && <SourceSubscriptions />}
       {current === 'io' && <ConfigIoPanel />}
+      </fieldset>
     </Drawer>
   );
 }

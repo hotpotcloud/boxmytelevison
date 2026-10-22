@@ -45,10 +45,11 @@ function LiveContent() {
   const liveSelectedUrls = useAppStore((s) => s.liveSelectedUrls);
   const liveEnvSources = useAppStore((s) => s.liveEnvSources);
   const liveSubscriptions = useAppStore((s) => s.liveSubscriptions);
-  const liveFavorites = useAppStore((s) => s.liveFavorites);
+  const storedFavorites = useAppStore((s) => s.liveFavorites);
   const imageProxyMode = useAppStore((s) => s.imageProxyMode);
   const customImageProxy = useAppStore((s) => s.customImageProxy);
-  const { verified } = useAuth();
+  const { checked: verified, user, openLogin } = useAuth();
+  const liveFavorites = user ? storedFavorites : [];
   const [copied, setCopied] = useState(false);
   // 移动端频道抽屉开合
   const [listOpen, setListOpen] = useState(false);
@@ -132,7 +133,7 @@ function LiveContent() {
       if (c.tvgId) sp.set('tvgId', c.tvgId);
       if (c.epg) sp.set('epg', c.epg);
       router.replace(`/live?${sp.toString()}`, { scroll: false });
-      useAppStore.getState().addLiveRecent({
+      if (user) useAppStore.getState().addLiveRecent({
         url: c.url,
         name: c.name,
         logo: c.logo,
@@ -142,7 +143,7 @@ function LiveContent() {
         sourceUrl: c.sourceUrl,
       });
     },
-    [router]
+    [router, user]
   );
 
   const handleFilteredChange = useCallback((list: LiveChannelItem[]) => {
@@ -336,7 +337,7 @@ function LiveContent() {
                     )}
                     aria-label={isFavorite ? '取消收藏' : '收藏'}
                     title={isFavorite ? '取消收藏' : '收藏'}
-                    onClick={() => useAppStore.getState().toggleLiveFavorite(currentChannel.url)}
+                    onClick={() => user ? useAppStore.getState().toggleLiveFavorite(currentChannel.url) : openLogin()}
                   >
                     <svg
                       className="w-4 h-4"

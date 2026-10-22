@@ -256,15 +256,15 @@ describe('POST /api/search', () => {
     expect(await fresh.json()).toEqual({ list: [], failures: [] });
   });
 
-  it('未登录返回 401，关闭注册且未配置密码返回 503', async () => {
-    vi.stubGlobal('fetch', vi.fn());
+  it('游客可搜索，关闭注册或未配置访问密码不影响浏览', async () => {
+    mockUpstream();
     const saved = process.env.PASSWORD;
     delete process.env.PASSWORD;
     const savedMode = process.env.REGISTRATION_MODE;
     process.env.REGISTRATION_MODE = 'closed';
     try {
       const noPassword = await POST(makeRequest({ wd: 'x', sources: SOURCES }));
-      expect(noPassword.status).toBe(503);
+      expect(noPassword.status).toBe(200);
     } finally {
       process.env.PASSWORD = saved;
       if (savedMode === undefined) delete process.env.REGISTRATION_MODE;
@@ -276,6 +276,6 @@ describe('POST /api/search', () => {
       body: JSON.stringify({ wd: 'x', sources: SOURCES }),
     });
     const unauthorized = await POST(noCookie);
-    expect(unauthorized.status).toBe(401);
+    expect(unauthorized.status).toBe(200);
   });
 });

@@ -9,9 +9,9 @@ export default function AboutPage() {
       <Header />
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-10 space-y-8">
         <section>
-          <h1 className="text-xl font-bold text-content mb-3">关于 LibreTV</h1>
+          <h1 className="text-xl font-bold text-content mb-3">关于幕间 · Muu</h1>
           <p className="text-sm text-muted leading-relaxed">
-            LibreTV 是一个免费的在线视频搜索与观看平台。输入片名即可在多个点播源中聚合搜索，
+            幕间 · Muu 是基于 LibreTV 开源项目迭代的免费的在线视频搜索与观看平台。输入片名即可在多个点播源中聚合搜索，
             无需注册、无内嵌广告、不存储任何视频文件。所有播放内容均来自第三方公开接口。
           </p>
         </section>
@@ -31,7 +31,7 @@ export default function AboutPage() {
         <section>
           <h2 className="text-base font-semibold text-content mb-2.5">隐私与数据</h2>
           <p className="text-sm text-muted leading-relaxed">
-            你的搜索历史、观看进度等数据仅保存在本设备浏览器中（IndexedDB），不会上传到服务器。
+            游客不保存搜索与观看历史；登录后的历史与收藏保存在当前浏览器。个人新增源随账号保存到服务器，支持跨设备恢复。
             聚合搜索请求由服务端代理转发，第三方数据源不会看到你的 IP 地址。
           </p>
         </section>

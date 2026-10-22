@@ -4,17 +4,17 @@ import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
   title: {
-    default: 'LibreTV - 免费在线视频搜索与观看平台',
-    template: '%s - LibreTV',
+    default: '幕间 · Muu - 免费在线视频搜索与观看平台',
+    template: '%s - 幕间 · Muu',
   },
   description:
-    'LibreTV 是一个免费的在线视频搜索平台，无广告、安全，提供来自多个视频源的内容搜索与观看服务，支持个人账号登录和持久会话。',
+    '幕间 · Muu 是一个免费的在线视频搜索平台，无广告、安全，提供来自多个视频源的内容搜索与观看服务，支持个人账号登录和持久会话。',
   manifest: '/manifest.webmanifest',
-  // 图标与门户站（LibreTV-portal）同一套：同一张 artwork 导出的多尺寸 + 根目录 favicon.ico 兜底。
+  // 图标与门户站（幕间 · Muu-portal）同一套：同一张 artwork 导出的多尺寸 + 根目录 favicon.ico 兜底。
   // 只声明单张 512 时，抓取端只能拿大图缩放，小尺寸下易糊、看起来「没填满」。
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/muu-logo.svg', type: 'image/svg+xml' },
       { url: '/icons/icon-96.png', sizes: '96x96', type: 'image/png' },
       { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },

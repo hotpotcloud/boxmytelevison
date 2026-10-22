@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ToastProvider } from './toast';
 import { FavoritesProvider } from './favorites';
+import { SourceSyncProvider } from './source-sync';
 import { AuthProvider } from './auth';
 import { ThemeProvider } from './theme';
 import { GlobalDownloadManager } from './download-manager';
@@ -51,9 +52,11 @@ export function Providers({ children }: { children: ReactNode }) {
           {/* 全站常驻：下载事件监听（enqueueDownload）依赖它存在——
               挂在 Header 里会让 /watch 等不渲染 Header 的页面派发的事件凭空丢失 */}
           <GlobalDownloadManager />
-          <FavoritesProvider>
-            <AuthProvider>{children}</AuthProvider>
-          </FavoritesProvider>
+          <AuthProvider>
+            <SourceSyncProvider>
+              <FavoritesProvider>{children}</FavoritesProvider>
+            </SourceSyncProvider>
+          </AuthProvider>
         </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>

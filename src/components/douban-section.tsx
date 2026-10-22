@@ -45,7 +45,7 @@ const LISTS = [
   { id: 'baidu_teleplay', label: '百度热播剧', tv: true },
 ];
 export function RecommendSection({ onPick }: { onPick: (title: string) => void }) {
-  const { verified, openLogin } = useAuth();
+  const { checked: verified, openLogin } = useAuth();
   const params = useSearchParams();
   const router = useRouter();
   const enabled = useAppStore((s) => s.doubanEnabled);
@@ -73,7 +73,7 @@ export function RecommendSection({ onPick }: { onPick: (title: string) => void }
     router.push(`/?${next.toString()}`, { scroll: false });
   };
   const query = useQuery({
-    queryKey: ['discovery-v2', source, category, tag, listId, weekday],
+    queryKey: ['discovery-v3', source, category, tag, listId, weekday],
     enabled: enabled && verified,
     staleTime: 300000,
     queryFn: async ({ signal }) => {
@@ -92,8 +92,8 @@ export function RecommendSection({ onPick }: { onPick: (title: string) => void }
             : category === 'movie'
               ? ['douban_movie_weekly']
               : category === 'tv'
-                ? ['douban_tv_chinese', 'douban_tv_global']
-                : ['douban_movie_weekly', 'douban_tv_chinese'];
+                ? LISTS.filter((list) => list.tv).map((list) => list.id)
+                : LISTS.map((list) => list.id);
         jobs = selected.map((id) => api.hotList(id, signal).then((data) => data.items));
       } else {
         const types: ('movie' | 'tv')[] =
@@ -123,7 +123,40 @@ export function RecommendSection({ onPick }: { onPick: (title: string) => void }
       };
     },
   });
-  const items = [...(query.data?.items || [])];
+  // Popular titles can render while the slower weekly lists are still refreshing.
+  const catalog = useQuery({
+    queryKey: ['discovery-catalog', category],
+    enabled: enabled && verified && source === 'hot-list' && listId === 'all',
+    staleTime: 300000,
+    queryFn: async ({ signal }) => {
+      const types: ('movie' | 'tv')[] =
+        category === 'all' ? ['movie', 'tv'] : [category as 'movie' | 'tv'];
+      const results = await Promise.allSettled(
+        types.map((type) =>
+          api
+            .douban(type, '热门', 0, 50, signal)
+            .then((data) => data.items.map((item) => ({ ...item, isTv: type === 'tv' }))),
+        ),
+      );
+      const good = results.filter(
+        (r): r is PromiseFulfilledResult<(DoubanItem & { isTv: boolean })[]> =>
+          r.status === 'fulfilled',
+      );
+      if (!good.length) throw new Error('热门片单暂不可用');
+      return good.flatMap((r) => r.value);
+    },
+  });
+  const popular = source === 'hot-list' && listId === 'all' ? catalog.data || [] : [];
+  const seenTitles = new Set<string>();
+  const items = [...popular, ...(query.data?.items || [])].filter((item) => {
+    const key = item.title + ':' + item.isTv;
+    if (seenTitles.has(key)) return false;
+    seenTitles.add(key);
+    return true;
+  });
+  const loading =
+    items.length === 0 &&
+    (query.isLoading || (source === 'hot-list' && listId === 'all' && catalog.isLoading));
   if (sort === 'rating') items.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
   if (sort === 'title') items.sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'));
   const page = Math.min(
@@ -146,7 +179,7 @@ export function RecommendSection({ onPick }: { onPick: (title: string) => void }
     );
   return (
     <>
-      {verified && query.isLoading && (
+      {verified && loading && (
         <div className="featured-grid" aria-hidden>
           <div className="featured-card featured-main animate-pulse bg-chip" />
           <div className="featured-card animate-pulse bg-chip" />
@@ -269,13 +302,19 @@ export function RecommendSection({ onPick }: { onPick: (title: string) => void }
               登录 / 注册
             </button>
           </div>
-        ) : query.isLoading ? (
+        ) : loading ? (
           <GridSkeleton />
-        ) : query.isError ? (
+        ) : query.isError && items.length === 0 ? (
           <div className="library-state">
             <h3>片单暂时无法加载</h3>
             <p>推荐源可能暂时不可用。可以点击重试、切换推荐来源，或直接搜索片名。</p>
-            <button className="btn-ghost min-h-11" onClick={() => void query.refetch()}>
+            <button
+              className="btn-ghost min-h-11"
+              onClick={() => {
+                void query.refetch();
+                if (source === 'hot-list') void catalog.refetch();
+              }}
+            >
               重新加载
             </button>
           </div>

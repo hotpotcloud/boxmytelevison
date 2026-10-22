@@ -51,7 +51,7 @@ describe('account API integration', () => {
     expect(session).toContain('SameSite=lax');
     expect(session).toContain('Max-Age=');
     const cookie = session.split(';')[0];
-    expect(guardRequest(new Request('http://local.test/api/search', { headers: { cookie } }))).toBe(
+    expect(guardRequest(new Request('http://local.test/api/publish', { headers: { cookie } }))).toBe(
       null,
     );
     const me = await GET(

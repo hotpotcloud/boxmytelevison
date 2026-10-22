@@ -6,6 +6,7 @@ import { addSearchHistory, clearSearchHistory, db, removeSearchHistory, restoreS
 import { cn } from '@/lib/utils';
 import { useToast } from './toast';
 import { Icon } from './icon';
+import { useAuth } from './auth';
 
 /** 下拉最多展示条数，与 db 层 MAX_SEARCH_HISTORY 保持一致 */
 const HISTORY_LIMIT = 10;
@@ -15,6 +16,7 @@ const HISTORY_LIMIT = 10;
  * 首页搜索框与顶栏搜索框共用本 hook 与下方 SearchHistoryDropdown，避免两处实现分叉。
  */
 export function useSearchHistory(input: string) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   /** 键盘高亮项下标，-1 表示未选中 */
@@ -22,15 +24,16 @@ export function useSearchHistory(input: string) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const history = useQuery({
-    queryKey: ['searchHistory'],
+    queryKey: ['searchHistory', user?.id],
+    enabled: Boolean(user),
     queryFn: () => db.searchHistory.orderBy('timestamp').reverse().limit(HISTORY_LIMIT).toArray(),
   });
 
   const matches = useMemo(() => {
-    const all = history.data ?? [];
+    const all = user ? history.data ?? [] : [];
     const keyword = input.trim().toLowerCase();
     return keyword ? all.filter((h) => h.text.toLowerCase().includes(keyword)) : all;
-  }, [history.data, input]);
+  }, [history.data, input, user]);
 
   // 唯一命中项与输入内容完全一致时不展开：否则会盖住用户刚敲进去的内容
   const visible = open && matches.length > 0 && !(matches.length === 1 && matches[0].text === input.trim());
@@ -52,6 +55,7 @@ export function useSearchHistory(input: string) {
 
   /** 记录一次搜索；顺带刷新下拉数据（历史也会在播放页被写入） */
   const record = (text: string) => {
+    if (!user) return;
     addSearchHistory(text)
       .then(() => history.refetch())
       .catch(() => {});
@@ -80,6 +84,7 @@ export function useSearchHistory(input: string) {
   };
 
   const onFocus = () => {
+    if (!user) return;
     setOpen(true);
     history.refetch();
   };

@@ -1,4 +1,5 @@
 'use client';
+import { useAuth } from './auth';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/client-api';
@@ -71,6 +72,8 @@ const dedupeByKey = (items: QualityProbeTarget[]): QualityProbeTarget[] => {
  * 结果一律写回 `useAppStore.setQuality`，换页面/再次搜索时可复用（TTL 与 LRU 由 store 负责）。
  */
 export function useQualityProbe(sources?: SourceConfig[]) {
+  const auth = useAuth();
+  const authRef = useRef(auth); authRef.current = auth;
   const [qualities, setQualities] = useState<Record<string, QualityEntry>>({});
   const [probing, setProbing] = useState<Record<string, true>>({});
   const [targets, setTargets] = useState<QualityProbeTarget[]>([]);
@@ -173,6 +176,7 @@ export function useQualityProbe(sources?: SourceConfig[]) {
 
   const probe = useCallback(
     (items: QualityProbeTarget[], opts?: { force?: boolean }) => {
+      if (!authRef.current.user) { if(opts?.force) authRef.current.openLogin(); return; }
       const list = dedupeByKey(items);
       if (list.length === 0) return;
       setTargets(list);
@@ -279,6 +283,7 @@ export function useQualityProbe(sources?: SourceConfig[]) {
    */
   const probeQueued = useCallback(
     (items: QualityProbeTarget[]) => {
+      if (!authRef.current.user) return;
       const list = dedupeByKey(items);
       if (list.length === 0) return;
       setTargets(list);

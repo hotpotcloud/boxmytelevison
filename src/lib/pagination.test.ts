@@ -6,7 +6,7 @@ describe('URL pagination boundaries', () => {
       expect(pageNumber(value)).toBe(1);
     expect(pageNumber('3')).toBe(3);
     expect(pageSize('48')).toBe(48);
-    expect(pageSize('99999')).toBe(12);
+    expect(pageSize('99999')).toBe(24);
   });
   it('renders edges, nearby pages and stable gaps', () => {
     expect(paginationWindow(1, 1)).toEqual([1]);

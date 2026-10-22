@@ -20,3 +20,5 @@
 - [UI 全站改版执行标准与验收](iterations/002-ui/README.md)
 
 - [本地验收记录与实际页面截图](design/verification/README.md)
+
+- [003 · 幕间 Muu：游客、播放页与账号源同步](iterations/003-muu/README.md)

@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { Brand } from './brand';
 import { Suspense, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as Menu from '@radix-ui/react-dropdown-menu';
@@ -52,12 +53,9 @@ function HeaderContent({ showSearch }: { showSearch: boolean }) {
     <>
       <aside className="app-sidebar" aria-label="主导航">
         <Link href="/" className="app-brand">
-          <span className="brand-symbol">
-            <Icon name="play" />
-          </span>
-          <span>LibreTV</span>
+          <Brand />
         </Link>
-        <div className="sidebar-section-label">浏览</div>
+        <div className="sidebar-section-label">探索内容</div>
         <nav className="sidebar-group">
           {BROWSE.map((item) => (
             <Link
@@ -71,7 +69,7 @@ function HeaderContent({ showSearch }: { showSearch: boolean }) {
             </Link>
           ))}
         </nav>
-        <div className="sidebar-section-label">我的</div>
+        <div className="sidebar-section-label">个人资料库</div>
         <nav className="sidebar-group">
           <button className="sidebar-link" onClick={() => setHistoryOpen(true)}>
             <Icon name="clock" />
@@ -92,6 +90,18 @@ function HeaderContent({ showSearch }: { showSearch: boolean }) {
             个人账号
           </Link>
         </nav>
+        <div className="sidebar-account-card">
+          <Icon name="user" className="w-5 h-5" />
+          <div>
+            <strong>{user ? name : '自由观看，无需登录'}</strong>
+            <p>{user ? '个人源随账号同步' : '登录可使用收藏与历史'}</p>
+          </div>
+          {!user && (
+            <button className="btn-ghost btn-sm" onClick={openLogin}>
+              登录 / 注册
+            </button>
+          )}
+        </div>
         <div className="sidebar-bottom">
           <div className="sidebar-rule" />
           <button className="sidebar-link" onClick={() => setSettingsOpen(true)}>
@@ -104,18 +114,15 @@ function HeaderContent({ showSearch }: { showSearch: boolean }) {
           </button>
           <Link className="sidebar-link" href="/about">
             <Icon name="info" />
-            关于 LibreTV
+            关于幕间
           </Link>
           <p className="sidebar-caption">好故事，随时开场。</p>
         </div>
       </aside>
       <header className="site-toolbar">
         <div className="toolbar-inner">
-          <Link href="/" className="mobile-brand" aria-label="LibreTV 首页">
-            <span className="brand-symbol">
-              <Icon name="play" />
-            </span>
-            <strong>LibreTV</strong>
+          <Link href="/" className="mobile-brand" aria-label="幕间首页">
+            <Brand />
           </Link>
           <div className="toolbar-breadcrumb">
             <Icon

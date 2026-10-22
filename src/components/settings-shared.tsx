@@ -1,4 +1,5 @@
 'use client';
+import { useAuth } from './auth';
 
 import { useCallback, useState, type ReactNode } from 'react';
 import { cn, formatDisableTtl } from '@/lib/utils';
@@ -20,12 +21,14 @@ export type TestState =
 
 /** 探活结果状态管理：替代两条源列表各自维护一份 tests 的实现 */
 export function useSourceTests() {
+  const { user, openLogin } = useAuth();
   const [tests, setTests] = useState<Record<string, TestState>>({});
   const runTest = useCallback(
     async (
       key: string,
       run: () => Promise<{ ok: boolean; ms?: number; count?: number; error?: string }>
     ) => {
+      if (!user) { openLogin(); return; }
       setTests((prev) => ({ ...prev, [key]: { status: 'loading' } }));
       try {
         const r = await run();
@@ -42,7 +45,7 @@ export function useSourceTests() {
         }));
       }
     },
-    []
+    [user, openLogin]
   );
   return { tests, runTest };
 }

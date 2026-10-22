@@ -1,4 +1,5 @@
 'use client';
+import { useAuth } from './auth';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -72,8 +73,11 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 
 export function LiveChannelList({ channels, currentUrl, onSelect, onFilteredChange }: ChannelListProps) {
   // 精确订阅：避免任何 store 字段变化（尤其测活节流写回）引发本组件重渲染
-  const liveFavorites = useAppStore((s) => s.liveFavorites);
-  const liveRecent = useAppStore((s) => s.liveRecent);
+  const { user } = useAuth();
+  const storedFavorites = useAppStore((s) => s.liveFavorites);
+  const liveFavorites = useMemo(() => user ? storedFavorites : [], [user, storedFavorites]);
+  const storedRecent = useAppStore((s) => s.liveRecent);
+  const liveRecent = useMemo(() => user ? storedRecent : [], [user, storedRecent]);
   const imageProxyMode = useAppStore((s) => s.imageProxyMode);
   const customImageProxy = useAppStore((s) => s.customImageProxy);
 
@@ -561,7 +565,7 @@ const ChannelRow = memo(function ChannelRow({
           onClick={(e) => {
             e.stopPropagation();
             // 点击时读取最新状态：行组件不订阅 store，保证探测期间的重渲染隔离
-            useAppStore.getState().toggleLiveFavorite(channel.url);
+            window.dispatchEvent(new CustomEvent('muu-toggle-live-favorite', { detail: channel.url }));
           }}
         >
           <svg className="w-3.5 h-3.5" fill={isFav ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">

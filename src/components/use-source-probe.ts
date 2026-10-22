@@ -1,4 +1,5 @@
 'use client';
+import { useAuth } from './auth';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/client-api';
@@ -26,6 +27,8 @@ export interface SourceProbeProgress {
 }
 
 export function useSourceProbe() {
+  const auth = useAuth();
+  const authRef = useRef(auth); authRef.current = auth;
   const [progress, setProgress] = useState<SourceProbeProgress | null>(null);
   const runIdRef = useRef(0);
 
@@ -44,6 +47,7 @@ export function useSourceProbe() {
   }, []);
 
   const probe = useCallback(async (sources: { key: string; url: string }[]) => {
+    if (!authRef.current.user) { authRef.current.openLogin(); return; }
     if (sources.length === 0) return;
     const runId = ++runIdRef.current;
     const total = sources.length;

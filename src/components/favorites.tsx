@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type FavoriteEntry } from '@/lib/db';
 import type { DoubanItem } from '@/lib/types';
 import { useToast } from './toast';
+import { useAuth } from './auth';
 const EMPTY: FavoriteEntry[] = [];
 const Context = createContext<{
   items: FavoriteEntry[];
@@ -13,10 +14,21 @@ const Context = createContext<{
 export const favoriteId = (item: { title: string }) => item.title.trim().toLowerCase();
 export const useFavorites = () => useContext(Context);
 export function FavoritesProvider({ children }: { children: ReactNode }) {
-  const items = useLiveQuery(() => db.favorites.orderBy('createdAt').reverse().toArray()) || EMPTY;
+  const { user, openLogin } = useAuth();
+  const storedItems =
+    useLiveQuery(
+      () => (user ? db.favorites.orderBy('createdAt').reverse().toArray() : Promise.resolve(EMPTY)),
+      [user?.id],
+    ) || EMPTY;
+  const items = user ? storedItems : EMPTY;
   const ids = useMemo(() => new Set(items.map((item) => item.id)), [items]);
   const { toast } = useToast();
   const toggle = async (item: DoubanItem) => {
+    if (!user) {
+      toast('登录后才能收藏', 'info');
+      openLogin();
+      return;
+    }
     const id = favoriteId(item);
     try {
       if (ids.has(id)) {

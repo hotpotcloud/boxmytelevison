@@ -48,6 +48,11 @@ export function accountDatabase(): Sqlite.DatabaseSync {
         created_at INTEGER NOT NULL,
         expires_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS user_source_profiles (
+        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        config_json TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL
+      );
+      INSERT OR IGNORE INTO schema_migrations VALUES (2, unixepoch() * 1000);
       CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
       CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
       INSERT OR IGNORE INTO schema_migrations VALUES (1, unixepoch() * 1000);

@@ -16,7 +16,7 @@ export function assertSameOrigin(req: Request) {
       throw new AccountError('不允许跨站请求', 403);
   }
 }
-export async function readAccountBody(req: Request): Promise<Record<string, unknown>> {
+export async function readAccountBody(req: Request, maxBytes = 4096): Promise<Record<string, unknown>> {
   if (!req.headers.get('content-type')?.startsWith('application/json'))
     throw new AccountError('请使用 JSON 提交', 415);
   const reader = req.body?.getReader();
@@ -28,7 +28,7 @@ export async function readAccountBody(req: Request): Promise<Record<string, unkn
       const { done, value } = await reader.read();
       if (done) break;
       bytes += value.byteLength;
-      if (bytes > 4096) {
+      if (bytes > maxBytes) {
         await reader.cancel();
         throw new AccountError('请求内容过大', 413);
       }

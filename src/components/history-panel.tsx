@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Link from 'next/link';
 import { Drawer } from './drawer';
+import { useAuth } from './auth';
 import { ConfirmDialog } from './confirm-dialog';
 import { EmptyState, LoadingState } from './states';
 import { Icon } from './icon';
@@ -30,10 +31,14 @@ import { resolveSource, useAppStore } from '@/lib/store';
 const VISIBLE_LIMIT = 50;
 
 export function HistoryPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user, openLogin } = useAuth();
   // 全量读取（上限即 DB 淘汰上限）：默认只渲染最近若干条，搜索时覆盖更早的记录
   const history = useLiveQuery(
-    () => db.history.orderBy('timestamp').reverse().limit(MAX_HISTORY).toArray(),
-    [open]
+    () =>
+      user
+        ? db.history.orderBy('timestamp').reverse().limit(MAX_HISTORY).toArray()
+        : Promise.resolve([] as HistoryEntry[]),
+    [open, user?.id],
   );
   const { toast } = useToast();
   const [confirmClear, setConfirmClear] = useState(false);
@@ -97,7 +102,22 @@ export function HistoryPanel({ open, onClose }: { open: boolean; onClose: () => 
         ) : undefined
       }
     >
-      {!history ? (
+      {!user ? (
+        <div className="library-state">
+          <Icon name="clock" className="w-8 h-8 text-accent" />
+          <h2>登录后记录观看足迹</h2>
+          <p>游客可以自由观看，不保存观看记录与播放进度。</p>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              onClose();
+              openLogin();
+            }}
+          >
+            登录 / 注册
+          </button>
+        </div>
+      ) : !history ? (
         <LoadingState />
       ) : total === 0 ? (
         <EmptyState variant="plain" title="暂无观看记录" />
@@ -205,15 +225,29 @@ function HistoryItem({ item }: { item: HistoryEntry }) {
             />
           ) : (
             <div className="w-10 h-14 rounded bg-chip flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16m10-16v16M7 8h10M7 12h10" />
+              <svg
+                className="w-4 h-4 text-faint"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 4v16m10-16v16M7 8h10M7 12h10"
+                />
               </svg>
             </div>
           )}
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-content truncate">{item.title}</div>
             <div className="text-xs text-faint mt-0.5 flex items-center gap-1.5 flex-wrap">
-              {item.totalEpisodes > 0 && <span>第 {item.episodeIndex + 1}/{item.totalEpisodes} 集</span>}
+              {item.totalEpisodes > 0 && (
+                <span>
+                  第 {item.episodeIndex + 1}/{item.totalEpisodes} 集
+                </span>
+              )}
               {hasPercent && <span>· {formatTime(item.playbackPosition)}</span>}
               <span>· {formatRelativeTime(item.timestamp)}</span>
             </div>
@@ -228,14 +262,19 @@ function HistoryItem({ item }: { item: HistoryEntry }) {
       <button
         className={cn(
           'absolute right-2 top-2 p-2 rounded-full text-faint hover:text-danger',
-          'opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity'
+          'opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity',
         )}
         aria-label="删除记录"
         title="删除记录（可在提示中撤销）"
         onClick={remove}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
         </svg>
       </button>
     </li>

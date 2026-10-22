@@ -1,0 +1,23 @@
+{
+  "home": {
+    "posters": 24,
+    "pagination": "共 100 部 · 第 1 / 5 页"
+  },
+  "guestFavoriteBlocked": true,
+  "watch": {
+    "width1440": 1034,
+    "width1920": 1474,
+    "episodeGroups": true
+  },
+  "guestStorage": {
+    "history": 0,
+    "progress": 0,
+    "searchHistory": 0,
+    "favorites": 0
+  },
+  "crossDeviceSources": true,
+  "accountIsolation": true,
+  "conflictSurvivesReload": true,
+  "logoutIsolation": true,
+  "pageErrors": []
+}

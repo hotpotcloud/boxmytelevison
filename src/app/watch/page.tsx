@@ -19,6 +19,8 @@ import { EmptyState, LoadingState, Spinner } from '@/components/states';
 import { SwitchSourceModal } from '@/components/switch-source';
 import { enqueueDownload } from '@/components/download-manager';
 import { Icon } from '@/components/icon';
+import { ThemeToggle } from '@/components/theme';
+import { Brand } from '@/components/brand';
 import { useAuth } from '@/components/auth';
 import { resolveSource, useAppStore } from '@/lib/store';
 import { qualityKey } from '@/lib/quality';
@@ -49,7 +51,7 @@ function WatchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const store = useAppStore();
-  const { verified } = useAuth();
+  const { checked: verified, user, openLogin } = useAuth();
 
   const sourceKey = searchParams.get('source') || '';
   const vodId = searchParams.get('id') || '';
@@ -58,6 +60,8 @@ function WatchContent() {
   const indexParam = parseInt(searchParams.get('index') || '0', 10) || 0;
 
   const [reversed, setReversed] = useState(false);
+  const [theater, setTheater] = useState(false);
+  const [episodeGroup, setEpisodeGroup] = useState<number | null>(null);
   const [switchOpen, setSwitchOpen] = useState(false);
 
   const source = resolveSource(store, sourceKey, {
@@ -92,27 +96,28 @@ function WatchContent() {
 
   const goEpisode = useCallback(
     (index: number) => {
+      setEpisodeGroup(null);
       const sp = new URLSearchParams(searchParams.toString());
       sp.set('index', String(index));
       sp.set('url', episodes[index] || directUrl);
       sp.delete('position');
       router.replace(`/watch?${sp.toString()}`, { scroll: false });
     },
-    [router, searchParams, episodes, directUrl]
+    [router, searchParams, episodes, directUrl],
   );
 
   // 进度恢复优先级：URL position 参数 > IndexedDB 记录
   const getRestorePosition = useCallback(async () => {
     const urlPos = parseInt(searchParams.get('position') || '0', 10) || 0;
     if (urlPos > 0) return urlPos;
-    if (!vodId) return 0;
+    if (!user || !vodId) return 0;
     const entry = await db.progress.get(progressKeyOf(sourceKey, vodId, currentIndex));
     return entry?.position ?? 0;
-  }, [searchParams, sourceKey, vodId, currentIndex]);
+  }, [searchParams, sourceKey, vodId, currentIndex, user]);
 
   // 写入观看历史（进入页面即记录，进度后续增量更新）
   useEffect(() => {
-    if (!verified || !sourceKey || !currentUrl) return;
+    if (!user || !sourceKey || !currentUrl) return;
     const timer = setTimeout(() => {
       upsertHistory({
         sourceKey,
@@ -129,31 +134,34 @@ function WatchContent() {
     }, 2000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [verified, sourceKey, vodId, currentIndex, videoTitle, currentUrl]);
+  }, [user, sourceKey, vodId, currentIndex, videoTitle, currentUrl]);
 
   // 播放中与暂停时的进度落盘逻辑一致，共用同一回调
   const handleProgress = useCallback(
     (position: number, duration: number) => {
-      if (vodId) {
+      if (user && vodId) {
         saveProgress(sourceKey, vodId, currentIndex, position, duration).catch(() => {});
         updateHistoryProgress(sourceKey, vodId || currentUrl, position, duration).catch(() => {});
       }
     },
-    [sourceKey, vodId, currentIndex, currentUrl]
+    [sourceKey, vodId, currentIndex, currentUrl, user],
   );
 
   // 自动连播的 800ms 延迟切集要在卸载时取消，避免离开页面后跳转
   const autoNextTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (autoNextTimer.current) clearTimeout(autoNextTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (autoNextTimer.current) clearTimeout(autoNextTimer.current);
+    },
+    [],
+  );
 
   const handleEnded = useCallback(() => {
-    if (vodId) clearProgress(sourceKey, vodId, currentIndex).catch(() => {});
+    if (user && vodId) clearProgress(sourceKey, vodId, currentIndex).catch(() => {});
     if (store.autoplayNext && currentIndex < episodes.length - 1) {
       autoNextTimer.current = setTimeout(() => goEpisode(currentIndex + 1), 800);
     }
-  }, [store.autoplayNext, currentIndex, episodes.length, goEpisode, sourceKey, vodId]);
+  }, [store.autoplayNext, currentIndex, episodes.length, goEpisode, sourceKey, vodId, user]);
 
   // Alt+←/→ 集数切换快捷键
   useEffect(() => {
@@ -171,7 +179,11 @@ function WatchContent() {
     return () => document.removeEventListener('keydown', handler);
   }, [currentIndex, episodes.length, goEpisode]);
 
-  const orderedEpisodes = reversed ? [...episodes].map((_, i) => episodes.length - 1 - i) : episodes.map((_, i) => i);
+  const activeGroup = episodeGroup ?? Math.floor(currentIndex / 40);
+  const orderedEpisodes = episodes
+    .map((_, i) => i)
+    .filter((i) => Math.floor(i / 40) === activeGroup);
+  if (reversed) orderedEpisodes.reverse();
 
   if (!verified) {
     return (
@@ -189,18 +201,23 @@ function WatchContent() {
           <p className="text-sm text-muted mb-4">
             该视频来自点播源「{sourceKey}」，但它可能已被删除。请在设置中重新添加后重试。
           </p>
-          <Link href="/" className="btn-primary">返回首页</Link>
+          <Link href="/" className="btn-primary">
+            返回首页
+          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className={`watch-page min-h-screen flex flex-col ${theater ? 'is-theater' : ''}`}>
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="watch-toolbar flex items-center gap-3">
           <BackButton />
-          <HomeButton />
+          <Link href="/" className="watch-brand" aria-label="幕间首页">
+            <Brand compact />
+          </Link>
+
           <div className="min-w-0">
             <h1 className="text-sm font-medium text-content truncate">{videoTitle}</h1>
             <p className="text-xs text-faint">
@@ -208,7 +225,8 @@ function WatchContent() {
               {episodes.length > 0 && ` · 第 ${currentIndex + 1}/${episodes.length} 集`}
             </p>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="watch-header-actions ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <button
               className="btn-ghost btn-sm"
               onClick={() => {
@@ -232,10 +250,10 @@ function WatchContent() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+      <main className="watch-main flex-1">
+        <div className="watch-workspace">
           <div>
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+            <div className="watch-player aspect-video bg-black overflow-hidden">
               {currentUrl ? (
                 <PlayerShell
                   url={currentUrl}
@@ -243,8 +261,14 @@ function WatchContent() {
                   adFilter={store.adFilter}
                   autoplayNext={store.autoplayNext}
                   episodeKey={`${sourceKey}:${vodId}:${currentIndex}`}
-                  nextUrl={currentIndex + 1 < episodes.length ? episodes[currentIndex + 1] : undefined}
-                  nextEpisodeKey={currentIndex + 1 < episodes.length ? `${sourceKey}:${vodId}:${currentIndex + 1}` : undefined}
+                  nextUrl={
+                    currentIndex + 1 < episodes.length ? episodes[currentIndex + 1] : undefined
+                  }
+                  nextEpisodeKey={
+                    currentIndex + 1 < episodes.length
+                      ? `${sourceKey}:${vodId}:${currentIndex + 1}`
+                      : undefined
+                  }
                   getRestorePosition={getRestorePosition}
                   onTimeUpdate={handleProgress}
                   onPause={handleProgress}
@@ -257,7 +281,11 @@ function WatchContent() {
                     // 播放实测是最权威的画质来源，回写后搜索列表里该「源 + 影片」直接显示
                     if (!sourceKey || !vodId) return;
                     useAppStore.getState().setQuality({
-                      [qualityKey(sourceKey, vodId)]: { height, from: 'play', timestamp: Date.now() },
+                      [qualityKey(sourceKey, vodId)]: {
+                        height,
+                        from: 'play',
+                        timestamp: Date.now(),
+                      },
                     });
                   }}
                 />
@@ -275,7 +303,7 @@ function WatchContent() {
             </div>
 
             {/* 操作栏 */}
-            <div className="flex flex-wrap items-center gap-2 mt-3">
+            <div className="watch-controls flex flex-wrap items-center gap-2">
               <button
                 className="btn-ghost btn-sm"
                 disabled={currentIndex <= 0}
@@ -290,6 +318,13 @@ function WatchContent() {
               >
                 下一集
               </button>
+              <button
+                className="btn-ghost btn-sm"
+                aria-pressed={theater}
+                onClick={() => setTheater((v) => !v)}
+              >
+                {theater ? '标准布局' : '影院布局'}
+              </button>
               <label className="flex items-center gap-1.5 text-xs text-muted ml-auto cursor-pointer">
                 <input
                   type="checkbox"
@@ -300,10 +335,31 @@ function WatchContent() {
                 自动连播
               </label>
             </div>
+            <section className="watch-info">
+              <p className="eyebrow">NOW PLAYING</p>
+              <h2>{videoTitle}</h2>
+              <p className="watch-metadata">
+                {[
+                  detailQuery.data?.videoInfo?.typeName,
+                  detailQuery.data?.videoInfo?.year,
+                  detailQuery.data?.videoInfo?.area,
+                  episodes.length > 1
+                    ? '第 ' + (currentIndex + 1) + ' 集 / 共 ' + episodes.length + ' 集'
+                    : '正片',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+              {detailQuery.data?.videoInfo?.desc && (
+                <p className="watch-description">
+                  {detailQuery.data.videoInfo.desc.replace(/<[^>]*>/g, '')}
+                </p>
+              )}
+            </section>
           </div>
 
           {/* 剧集侧栏 */}
-          <aside className="bg-surface-raised rounded-lg p-3 h-fit">
+          <aside className="watch-episodes bg-surface-raised">
             <div className="flex items-center justify-between gap-2 mb-2.5">
               <h2 className="text-sm font-semibold text-content">
                 剧集列表{episodes.length > 0 && `（${episodes.length}）`}
@@ -324,14 +380,38 @@ function WatchContent() {
                 </button>
               )}
             </div>
+            <div className="watch-source-card">
+              <span className="eyebrow">当前片源</span>
+              <strong>{source.name}</strong>
+              <button className="btn-ghost btn-sm" onClick={() => setSwitchOpen(true)}>
+                更换片源
+              </button>
+            </div>
+            {episodes.length > 40 && (
+              <div className="episode-groups" aria-label="选集分组">
+                {Array.from({ length: Math.ceil(episodes.length / 40) }, (_, group) => (
+                  <button
+                    key={group}
+                    className={cn('btn-ghost btn-sm', activeGroup === group && 'episode-active')}
+                    aria-pressed={activeGroup === group}
+                    onClick={() => setEpisodeGroup(group)}
+                  >
+                    {group * 40 + 1}–{Math.min(episodes.length, (group + 1) * 40)}
+                  </button>
+                ))}
+              </div>
+            )}
             {episodes.length === 0 ? (
               detailQuery.isLoading ? (
                 <LoadingState />
               ) : (
-                <EmptyState variant="plain" title={detailQuery.isError ? '获取剧集失败' : '暂无剧集信息'} />
+                <EmptyState
+                  variant="plain"
+                  title={detailQuery.isError ? '获取剧集失败' : '暂无剧集信息'}
+                />
               )
             ) : (
-              <div className="grid grid-cols-5 lg:grid-cols-4 gap-1.5 max-h-[65vh] overflow-y-auto scrollbar-thin pr-1">
+              <div className="watch-episode-grid scrollbar-thin">
                 {orderedEpisodes.map((realIndex) => (
                   <EpisodeButton
                     key={realIndex}
@@ -342,9 +422,17 @@ function WatchContent() {
                 ))}
               </div>
             )}
-            <p className="hidden md:block text-[10px] text-faint mt-3 leading-relaxed">
+            <p className="watch-shortcuts text-xs text-faint mt-3 leading-relaxed">
               快捷键：空格 播放/暂停 · ←/→ 快退/快进 5s · ↑/↓ 音量 · F 全屏 · Alt+←/→ 切换集数
             </p>
+            {!user && (
+              <div className="watch-guest-note">
+                <p>游客模式 · 不保存观看历史与进度</p>
+                <button className="btn-ghost btn-sm" onClick={openLogin}>
+                  登录开启记录
+                </button>
+              </div>
+            )}
           </aside>
         </div>
       </main>
@@ -363,7 +451,15 @@ function WatchContent() {
 }
 
 /** 集数按钮：激活时自动滚动进可视区（长剧列表） */
-function EpisodeButton({ index, active, onClick }: { index: number; active: boolean; onClick: () => void }) {
+function EpisodeButton({
+  index,
+  active,
+  onClick,
+}: {
+  index: number;
+  active: boolean;
+  onClick: () => void;
+}) {
   const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -374,6 +470,7 @@ function EpisodeButton({ index, active, onClick }: { index: number; active: bool
     <button
       ref={ref}
       className={cn('btn btn-sm !px-1', active ? 'episode-active' : 'btn-ghost')}
+      aria-current={active ? 'true' : undefined}
       onClick={onClick}
     >
       {index + 1}
@@ -396,19 +493,5 @@ function BackButton() {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
       </svg>
     </button>
-  );
-}
-
-/** 首页按钮：直达首页，避免从外链进入时逐级 back */
-function HomeButton() {
-  return (
-    <Link
-      href="/"
-      className="p-2 rounded-md text-muted hover:text-content hover:bg-hover transition-colors"
-      aria-label="回首页"
-      title="回首页"
-    >
-      <Icon name="home" className="w-5 h-5" />
-    </Link>
   );
 }

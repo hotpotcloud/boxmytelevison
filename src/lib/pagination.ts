@@ -19,5 +19,5 @@ export function pageNumber(value: string | null, fallback = 1): number {
 }
 export function pageSize(value: string | null): number {
   const parsed = Number(value);
-  return [12, 24, 48].includes(parsed) ? parsed : 12;
+  return [12, 24, 48].includes(parsed) ? parsed : 24;
 }
