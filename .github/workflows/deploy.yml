@@ -1,0 +1,104 @@
+name: Deploy to Tencent Cloud
+
+# 推送到 main 时自动部署；也支持在 Actions 页面手动触发
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一时刻只允许一个部署任务，避免并发互相覆盖
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  APP_DIR: /opt/boxmytelevison
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Package standalone
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+          tar -czf app.tar.gz -C .next/standalone .
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          source: "app.tar.gz,deploy/server.env,deploy/start.sh"
+          target: /tmp/deploy
+          strip_components: 1
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          APP_DIR: ${{ env.APP_DIR }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          envs: APP_PASSWORD,APP_DIR
+          script: |
+            set -e
+            cd /tmp/deploy
+            mkdir -p "$APP_DIR"
+
+            # 1) 解压新版本（覆盖代码，保留 .env 由下一步重建）
+            tar -xzf app.tar.gz -C "$APP_DIR"
+
+            # 2) 生成应用配置（预置源 + 访问密码）
+            cp server.env "$APP_DIR/.env"
+            echo "PASSWORD=${APP_PASSWORD}" >> "$APP_DIR/.env"
+
+            # 3) 启动脚本（加载 .env 后 exec node）
+            cp start.sh "$APP_DIR/start.sh"
+            chmod +x "$APP_DIR/start.sh"
+
+            # 4) 注册 systemd 服务（首次），随后重启
+            NODE_BIN=$(command -v node)
+            cat > /etc/systemd/system/boxmytelevison.service <<EOF
+            [Unit]
+            Description=BoxMyTelevision
+            After=network.target
+
+            [Service]
+            Type=simple
+            WorkingDirectory=$APP_DIR
+            ExecStart=$APP_DIR/start.sh
+            Restart=on-failure
+            RestartSec=5
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+            systemctl daemon-reload
+            systemctl enable boxmytelevison
+            systemctl restart boxmytelevison
+
+            sleep 3
+            echo "===== 服务状态 ====="
+            systemctl is-active boxmytelevison
+            echo "===== 本机自检 ====="
+            curl -sI http://127.0.0.1:8080 | head -1 || true
