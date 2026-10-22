@@ -1,0 +1,51 @@
+name: Inspect deployment transfer
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Deployment run ID to inspect
+        required: true
+        default: '39734430894'
+      attempt:
+        description: Deployment run attempt
+        required: true
+        default: '1'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read transfer progress and server capacity
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          TARGET_RUN: ${{ inputs.run_id }}
+          TARGET_ATTEMPT: ${{ inputs.attempt }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_RUN" =~ ^[0-9]+$ && "$TARGET_ATTEMPT" =~ ^[0-9]+$ ]]
+          key=$(mktemp)
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$key"
+          chmod 600 "$key"
+          timeout 180s ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=30 \
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o StrictHostKeyChecking=accept-new \
+            "${SSH_USER}@${SSH_HOST}" "bash -s -- '/tmp/boxmytelevison-${TARGET_RUN}-${TARGET_ATTEMPT}'" <<'REMOTE'
+          set -eu
+          stage=$1
+          echo 'Transfer file size before/after 10 seconds:'
+          stat -c '%n %s bytes' "$stage/app.tar.gz" 2>/dev/null || true
+          sleep 10
+          stat -c '%n %s bytes' "$stage/app.tar.gz" 2>/dev/null || true
+          echo 'Disk space:'
+          df -h /tmp /opt
+          echo 'Available memory:'
+          free -m
+          echo 'Resumable transfer tool:'
+          command -v rsync || true
+          echo 'Application service:'
+          systemctl is-active boxmytelevison || true
+          REMOTE
