@@ -1,26 +1,24 @@
 name: Deploy to Tencent Cloud
 
-# 推送到 main 时自动部署；也支持在 Actions 页面手动触发
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# 同一时刻只允许一个部署任务，避免并发互相覆盖
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 permissions:
-  contents: write   # 允许创建/更新滚动 Release 产物
+  contents: read
 
 env:
   APP_DIR: /opt/boxmytelevison
-  DIST_TAG: dist
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,6 +27,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -36,99 +35,69 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          DOCKER_BUILD: "1"
+          STANDALONE_BUILD: "1"
           NEXT_TELEMETRY_DISABLED: "1"
 
       - name: Package standalone
-        run: |
-          cp -r .next/static .next/standalone/.next/static
-          cp -r public .next/standalone/public
-          # 把部署所需的配置/启动脚本一并打进 tarball，服务器只需下载一个文件
-          cp deploy/server.env .next/standalone/_server.env
-          cp deploy/start.sh .next/standalone/_start.sh
-          tar -czf app.tar.gz -C .next/standalone .
-
-      - name: Publish rolling release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ env.DIST_TAG }}
-          name: Rolling build
-          artifacts: app.tar.gz
-          allowUpdates: true
-          replacesArtifacts: true
-          removeArtifacts: true
-          prerelease: false
-
-      - name: Deploy on server
-        uses: appleboy/ssh-action@v1.2.0
         env:
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
-          APP_DIR: ${{ env.APP_DIR }}
-          DIST_TAG: ${{ env.DIST_TAG }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          envs: APP_PASSWORD,APP_DIR,DIST_TAG
-          script: |
-            set -e
-            REL="https://github.com/hotpotcloud/boxmytelevison/releases/download/${DIST_TAG}/app.tar.gz"
+        run: |
+          set -euo pipefail
+          test -n "$APP_PASSWORD" || { echo '::error::APP_PASSWORD is empty'; exit 1; }
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+          cp deploy/server.env .next/standalone/.env
+          cp deploy/start.cjs .next/standalone/start.cjs
+          cp deploy/start.sh .next/standalone/start.sh
+          # JSON preserves special characters without interpreting the password as shell code.
+          node -e 'require("fs").writeFileSync(".next/standalone/password.json", JSON.stringify({password: process.env.APP_PASSWORD}), {mode: 0o600})'
+          tar -czf app.tar.gz -C .next/standalone .
+          sha256sum app.tar.gz > app.tar.gz.sha256
+          # The package contains a secret: transfer it only over SSH, never publish it.
 
-            mkdir -p "$APP_DIR"
-            cd /tmp
+      - name: Upload and deploy over SSH
+        timeout-minutes: 35
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || { echo '::error::Invalid SSH_HOST'; exit 1; }
+          [[ "$SSH_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || { echo '::error::Invalid SSH_USER'; exit 1; }
+          test -n "$SSH_PRIVATE_KEY" || { echo '::error::SSH_PRIVATE_KEY is empty'; exit 1; }
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+            host_check=yes
+          else
+            host_check=accept-new
+          fi
+          opts=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o StrictHostKeyChecking="$host_check")
+          target="${SSH_USER}@${SSH_HOST}"
+          stage="/tmp/boxmytelevison-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cleanup() {
+            ssh "${opts[@]}" "$target" "rm -f '$stage/app.tar.gz' '$stage/app.tar.gz.sha256' '$stage/deploy.sh'; rmdir '$stage' 2>/dev/null || true" || true
+            rm -f "$HOME/.ssh/deploy_key" app.tar.gz .next/standalone/password.json
+          }
+          trap cleanup EXIT
+          # Check runtime and permissions before spending time uploading.
+          ssh "${opts[@]}" "$target" 'set -e; node -e '\''if (Number(process.versions.node.split(".")[0]) < 22) process.exit(1)'\''; command -v curl; command -v sha256sum; command -v systemctl; if [ "$(id -u)" != 0 ]; then sudo -n true; fi'
+          ssh "${opts[@]}" "$target" "umask 077; mkdir -p '$stage'"
+          uploaded=0
+          for attempt in 1 2 3; do
+            if timeout 10m scp "${opts[@]}" app.tar.gz app.tar.gz.sha256 deploy/deploy.sh "$target:$stage/"; then
+              uploaded=1
+              break
+            fi
+            echo "Upload attempt $attempt failed; retrying..."
+          done
+          test "$uploaded" = 1 || { echo '::error::Upload failed'; exit 1; }
+          ssh "${opts[@]}" "$target" "bash '$stage/deploy.sh' '$stage' '$APP_DIR'"
 
-            # 1) 服务器直接从 GitHub 下载构建产物（含应用、配置、启动脚本）
-            #    跨境 CDN 易断流，采用"断点续传 + gzip 完整性校验"循环，直到拿到完整文件
-            rm -f app.tar.gz
-            ok=0
-            for i in $(seq 1 10); do
-              # 限速检测：30s 内平均速度低于 1KB/s 即判定为跨境断流并中止本次尝试；
-              # 单次最多 6 分钟，随后由外层循环断点续传，避免连接假死无限等待。
-              curl -fSL --retry 3 --retry-all-errors --continue-at - \
-                --connect-timeout 20 --max-time 360 \
-                --speed-limit 1024 --speed-time 30 \
-                -o app.tar.gz "$REL" || true
-              if gzip -t app.tar.gz 2>/dev/null; then ok=1; break; fi
-              echo "第 $i 次下载不完整（$(stat -c%s app.tar.gz 2>/dev/null || echo 0) 字节），断点续传重试..."
-            done
-            if [ "$ok" -ne 1 ]; then echo "构建产物下载失败/损坏"; exit 1; fi
-            echo "下载完成：$(stat -c%s app.tar.gz) 字节"
-
-            # 2) 解压新版本（覆盖应用代码）
-            tar -xzf app.tar.gz -C "$APP_DIR"
-
-            # 3) 生成应用配置（预置源 + 访问密码）
-            cp "$APP_DIR/_server.env" "$APP_DIR/.env"
-            echo "PASSWORD=${APP_PASSWORD}" >> "$APP_DIR/.env"
-
-            # 4) 启动脚本
-            cp "$APP_DIR/_start.sh" "$APP_DIR/start.sh"
-            chmod +x "$APP_DIR/start.sh"
-            rm -f "$APP_DIR/_server.env" "$APP_DIR/_start.sh"
-
-            # 5) 注册 systemd 服务（首次），随后重启
-            cat > /etc/systemd/system/boxmytelevison.service <<EOF
-            [Unit]
-            Description=BoxMyTelevision
-            After=network.target
-
-            [Service]
-            Type=simple
-            WorkingDirectory=$APP_DIR
-            ExecStart=$APP_DIR/start.sh
-            Restart=on-failure
-            RestartSec=5
-
-            [Install]
-            WantedBy=multi-user.target
-            EOF
-            systemctl daemon-reload
-            systemctl enable boxmytelevison
-            systemctl restart boxmytelevison
-
-            sleep 3
-            echo "===== 服务状态 ====="
-            systemctl is-active boxmytelevison
-            echo "===== 本机自检 ====="
-            curl -sI http://127.0.0.1:8080 | head -1 || true
+      - name: Remove local deployment credentials
+        if: always()
+        run: rm -f "$HOME/.ssh/deploy_key" app.tar.gz .next/standalone/password.json
