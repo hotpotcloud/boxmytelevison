@@ -339,6 +339,16 @@ export function PlayerShell({
     endedRef.current = false;
 
     let lastSave = 0;
+    let pageLeaving = false;
+    const stopPreloadOnLeave = () => {
+      pageLeaving = true;
+      getVideoPrefetcher().stop();
+      getNextEpisodePrefetcher().stop();
+      hlsRef.current?.stopLoad();
+    };
+    const resumePage = (event: PageTransitionEvent) => { pageLeaving = false; if (event.persisted) hlsRef.current?.startLoad(); };
+    window.addEventListener('pagehide', stopPreloadOnLeave);
+    window.addEventListener('pageshow', resumePage);
 
     const art = new Artplayer({
       container: containerRef.current,
@@ -457,10 +467,11 @@ export function PlayerShell({
     });
     art.on('video:pause', () => {
       propsRef.current.onPause?.(art.currentTime, art.duration);
-      // 暂停 = 预取黄金窗口：解除限速并无限铺满整集（用户主动行为，带宽占用可接受）
+      if (pageLeaving) return;
+      // 暂停沿用用户配置的预取窗口，避免突然改为整片下载挤占重播连接。
       // waiting 触发的限速在此解除，否则黄金窗口会被 500ms 轮询冻结
       getVideoPrefetcher().setThrottled(false);
-      ensurePrefetch(currentMediaUrlRef.current, art.currentTime, 0);
+      ensurePrefetch(currentMediaUrlRef.current, art.currentTime);
     });
     art.on('video:waiting', () => {
       // 卡顿：预取临时让出带宽给播放
@@ -587,6 +598,9 @@ export function PlayerShell({
           propsRef.current.onPause?.(art.currentTime, art.duration);
         } catch { /* 忽略 */ }
       }
+      stopPreloadOnLeave();
+      window.removeEventListener('pagehide', stopPreloadOnLeave);
+      window.removeEventListener('pageshow', resumePage);
       document.removeEventListener('keydown', shortcuts);
       document.removeEventListener('visibilitychange', saveOnHide);
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);

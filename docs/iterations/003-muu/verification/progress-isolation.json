@@ -1,0 +1,11 @@
+{
+  "guest": {
+    "history": 0,
+    "progress": 0
+  },
+  "member": {
+    "history": 1,
+    "progress": 1
+  },
+  "prefetchEnabled": false
+}

@@ -80,7 +80,9 @@ export function createHlsLoader(
               total: hit.data.byteLength,
               loaded: hit.data.byteLength,
             });
-            callbacks.onSuccess({ url: context.url, data: hit.data }, this.stats, context, undefined);
+            // Match the native loader: feed cached bytes to the transmuxer before completion.
+            callbacks.onProgress?.(this.stats, context, hit.data, undefined);
+            if (!this.destroyed) callbacks.onSuccess({ url: context.url, data: hit.data }, this.stats, context, undefined);
             return;
           }
           onProbe?.(false);
