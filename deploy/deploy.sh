@@ -18,9 +18,36 @@ esac
 release="$app_dir/releases/$(basename "$stage")"
 install -d -m 700 "$release"
 tar -xzf app.tar.gz -C "$release"
-node_bin="$release/_node"
-chmod 700 "$node_bin"
+# Reuse Node 22 when present; otherwise install it once on the server.
+node_bin=$(command -v node || true)
+if [ -z "$node_bin" ] || ! "$node_bin" -e 'process.exit(Number(process.versions.node.split(".")[0]) === 22 ? 0 : 1)'; then
+  node_version=$(cat "$release/.node-version")
+  node_sha=$(cat "$release/.node-sha256")
+  [[ "$node_version" =~ ^v22\.[0-9]+\.[0-9]+$ ]]
+  [[ "$node_sha" =~ ^[a-f0-9]{64}$ ]]
+  runtime_dir="$app_dir/runtime/node-$node_version-linux-x64"
+  node_bin="$runtime_dir/bin/node"
+  if [ ! -x "$node_bin" ]; then
+    archive="node-$node_version-linux-x64.tar.xz"
+    downloaded=0
+    # Prefer the domestic mirror; verify it against the official checksum from CI.
+    for base in https://npmmirror.com/mirrors/node https://nodejs.org/dist; do
+      echo "Installing Node $node_version on server from $base"
+      if curl -fSL --retry 1 --connect-timeout 15 --max-time 180 \
+          -o "$stage/$archive" "$base/$node_version/$archive" &&
+        printf '%s  %s\n' "$node_sha" "$stage/$archive" | sha256sum -c -; then
+        downloaded=1
+        break
+      fi
+    done
+    [ "$downloaded" = 1 ] || { echo 'Node download or checksum verification failed'; exit 1; }
+    install -d "$app_dir/runtime"
+    tar -xJf "$stage/$archive" -C "$app_dir/runtime"
+    rm -f "$stage/$archive"
+  fi
+fi
 "$node_bin" --version
+printf '%s\n' "$node_bin" > "$release/.node-path"
 chmod 600 "$release/.env" "$release/password.json"
 test -f "$release/server.js"
 test -f "$release/start.cjs"

@@ -49,8 +49,13 @@ jobs:
           cp deploy/server.env .next/standalone/.env
           cp deploy/start.cjs .next/standalone/start.cjs
           cp deploy/start.sh .next/standalone/start.sh
-          # Ship the Linux Node 22 runtime too; the server never needs to install Node.
-          cp "$(command -v node)" .next/standalone/_node
+          # Send only the version and official checksum; Node itself is downloaded on the server.
+          node --version > .next/standalone/.node-version
+          node_archive="node-$(node --version)-linux-x64.tar.xz"
+          curl -fsSL --retry 2 --connect-timeout 15 --max-time 60 \
+            "https://nodejs.org/dist/$(node --version)/SHASUMS256.txt" \
+            | awk -v name="$node_archive" '$2 == name {print $1}' > .next/standalone/.node-sha256
+          test "$(wc -c < .next/standalone/.node-sha256)" -eq 65
           # JSON preserves special characters without interpreting the password as shell code.
           node -e 'require("fs").writeFileSync(".next/standalone/password.json", JSON.stringify({password: process.env.APP_PASSWORD}), {mode: 0o600})'
           tar -czf app.tar.gz -C .next/standalone .
@@ -87,7 +92,7 @@ jobs:
           }
           trap cleanup EXIT
           # Check runtime and permissions before spending time uploading.
-          ssh "${opts[@]}" "$target" 'set -e; test "$(uname -m)" = x86_64 || { echo "This build requires an x86_64 server"; exit 1; }; command -v curl; command -v sha256sum; command -v tar; command -v systemctl; if [ "$(id -u)" != 0 ]; then sudo -n true; fi'
+          ssh "${opts[@]}" "$target" 'set -e; test "$(uname -m)" = x86_64 || { echo "This build requires an x86_64 server"; exit 1; }; command -v curl; command -v sha256sum; command -v tar; command -v xz; command -v systemctl; if [ "$(id -u)" != 0 ]; then sudo -n true; fi'
           ssh "${opts[@]}" "$target" "umask 077; mkdir -p '$stage'"
           uploaded=0
           for attempt in 1 2 3; do
