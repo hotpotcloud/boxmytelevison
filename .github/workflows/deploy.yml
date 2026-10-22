@@ -3,6 +3,9 @@ name: Deploy to Tencent Cloud
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
   workflow_dispatch:
 
 concurrency:
@@ -32,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Verify
+        run: npm run typecheck && npm test
+
       - name: Build
         run: npm run build
         env:
@@ -41,6 +47,7 @@ jobs:
       - name: Package standalone
         env:
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$APP_PASSWORD" || { echo '::error::APP_PASSWORD is empty'; exit 1; }
@@ -48,6 +55,7 @@ jobs:
           cp -r public .next/standalone/public
           cp deploy/server.env .next/standalone/.env
           cp deploy/start.cjs .next/standalone/start.cjs
+          cp deploy/verify-accounts.cjs .next/standalone/verify-accounts.cjs
           cp deploy/start.sh .next/standalone/start.sh
           # Send only the version and official checksum; Node itself is downloaded on the server.
           node --version > .next/standalone/.node-version
@@ -56,8 +64,10 @@ jobs:
             "https://nodejs.org/dist/$(node --version)/SHASUMS256.txt" \
             | awk -v name="$node_archive" '$2 == name {print $1}' > .next/standalone/.node-sha256
           test "$(wc -c < .next/standalone/.node-sha256)" -eq 65
+          test -n "$BOOTSTRAP_ADMIN_PASSWORD" || { echo '::error::BOOTSTRAP_ADMIN_PASSWORD is empty'; exit 1; }
           # JSON preserves special characters without interpreting the password as shell code.
-          node -e 'require("fs").writeFileSync(".next/standalone/password.json", JSON.stringify({password: process.env.APP_PASSWORD}), {mode: 0o600})'
+          node -e 'require("fs").writeFileSync(".next/standalone/password.json", JSON.stringify({password: process.env.APP_PASSWORD, adminUsername: "xbf", adminPassword: process.env.BOOTSTRAP_ADMIN_PASSWORD}), {mode: 0o600})'
+          rm -rf .next/standalone/data
           tar -czf app.tar.gz -C .next/standalone .
           sha256sum app.tar.gz > app.tar.gz.sha256
           # The package contains a secret: transfer it only over SSH, never publish it.

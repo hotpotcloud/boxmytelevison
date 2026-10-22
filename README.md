@@ -244,3 +244,10 @@ CI 校验通过后自动构建并推送 `ghcr.io/librespark/libretv:<版本>`（
 本项目不存储、不制作任何视频内容，仅提供第三方公开接口的聚合与播放能力，内容的合法性由对应数据源负责。
 
 ☕ 觉得有用的话，可以到 [AFDIAN](https://afdian.com/a/veehub) 请我喝杯咖啡。
+## 账号与界面迭代（2.20.0）
+
+邮箱注册和登录、90 天持久会话、密码修改与服务端退出撤销，采用 Node.js 22.13+ 内置 SQLite。提供 iOS/macOS 风格的亮暗主题、分组导航、推荐与搜索分页、本机影片收藏。邮箱暂未验证，未接邮件验证码或邮件找回服务。
+
+当前腾讯云部署使用 **SSH + standalone + systemd**，数据库固定在发布目录之外，Node 在服务器安装并复用，不使用 Docker。管理员初始凭据通过部署机密初始化，不在代码中保存。
+
+详见 [迭代文档](docs/README.md)、[UI 执行标准](docs/iterations/002-ui/README.md) 和 [部署与恢复](docs/iterations/001-accounts/release.md)。

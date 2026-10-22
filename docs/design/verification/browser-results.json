@@ -1,0 +1,20 @@
+{
+  "source": "local production preview with live recommendation APIs",
+  "viewportChecks": [
+    "1440x1000 light/dark",
+    "375x812 light/dark"
+  ],
+  "checks": [
+    "real recommendation loading",
+    "next/previous page",
+    "page size and disabled boundary",
+    "movie grouping",
+    "favorites persistence and removal",
+    "mobile navigation and overflow",
+    "email registration",
+    "password change revokes old session",
+    "relogin and logout"
+  ],
+  "browserErrors": [],
+  "result": "passed"
+}

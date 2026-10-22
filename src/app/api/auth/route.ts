@@ -1,21 +1,39 @@
+import { revokeAccountSession } from '@/lib/accounts';
+import { assertSameOrigin, clearAuthCookies, accountErrorResponse } from '@/lib/account-http';
 import { NextResponse } from 'next/server';
-import { SESSION_COOKIE, checkRateLimit, sessionFromCookieHeader, signSession, checkPassword, clearRateLimit, isPasswordConfigured } from '@/lib/auth';
+import {
+  SESSION_COOKIE,
+  checkRateLimit,
+  sessionFromCookieHeader,
+  signSession,
+  checkPassword,
+  clearRateLimit,
+  isPasswordConfigured,
+} from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
+  try {
+    assertSameOrigin(req);
+  } catch (error) {
+    return accountErrorResponse(error);
+  }
   if (!isPasswordConfigured()) {
     return NextResponse.json(
       { success: false, error: '服务器未设置 PASSWORD 环境变量，请联系管理员配置' },
-      { status: 503 }
+      { status: 503 },
     );
   }
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    'unknown';
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
       { success: false, error: '尝试次数过多，请 10 分钟后再试' },
-      { status: 429 }
+      { status: 429 },
     );
   }
 
@@ -36,11 +54,12 @@ export async function POST(req: Request) {
   const res = NextResponse.json({ success: true });
   // Cookie Secure 策略：COOKIE_SECURE 环境变量显式覆盖；否则按 x-forwarded-proto 推导。
   // 不能依赖 req.url——Next.js Route Handler 中它是内部转发地址，并非用户侧的原始协议。
-  const secure = process.env.COOKIE_SECURE === 'true'
-    ? true
-    : process.env.COOKIE_SECURE === 'false'
-      ? false
-      : (req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? 'http') === 'https';
+  const secure =
+    process.env.COOKIE_SECURE === 'true'
+      ? true
+      : process.env.COOKIE_SECURE === 'false'
+        ? false
+        : (req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? 'http') === 'https';
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
@@ -58,8 +77,14 @@ export async function GET(req: Request) {
 }
 
 /** DELETE：登出 */
-export async function DELETE() {
-  const res = NextResponse.json({ success: true });
-  res.cookies.set(SESSION_COOKIE, '', { httpOnly: true, maxAge: 0, path: '/' });
-  return res;
+export async function DELETE(req: Request) {
+  try {
+    assertSameOrigin(req);
+    revokeAccountSession(req.headers.get('cookie'));
+    const res = NextResponse.json({ success: true }, { headers: { 'Cache-Control': 'no-store' } });
+    clearAuthCookies(res, req);
+    return res;
+  } catch (error) {
+    return accountErrorResponse(error);
+  }
 }

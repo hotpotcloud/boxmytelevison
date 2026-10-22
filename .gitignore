@@ -12,3 +12,9 @@ vitest-results.json
 .zcode/
 .codebuddy/
 generated-images/
+# Local account data and temporary tools
+data/
+.tmp/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

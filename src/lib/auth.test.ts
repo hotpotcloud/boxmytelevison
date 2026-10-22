@@ -1,6 +1,14 @@
 import crypto from 'node:crypto';
 import { afterEach, beforeAll, afterAll, describe, expect, it, vi } from 'vitest';
-import { SESSION_COOKIE, checkPassword, checkRateLimit, clearRateLimit, sessionFromCookieHeader, signSession, verifySession } from './auth';
+import {
+  SESSION_COOKIE,
+  checkPassword,
+  checkRateLimit,
+  clearRateLimit,
+  sessionFromCookieHeader,
+  signSession,
+  verifySession,
+} from './auth';
 
 /**
  * 会话鉴权单测：HMAC 签名/校验、过期、防篡改、密码恒定时间比较、登录限流。
@@ -56,6 +64,19 @@ describe('signSession / verifySession', () => {
     expect(verifySession('no-dot-token')).toBe(false);
     expect(verifySession('.sig')).toBe(false);
     expect(verifySession('abc.not-hex-sig')).toBe(false);
+  });
+});
+
+describe('unconfigured legacy access', () => {
+  it('rejects a legacy signature derived from an empty site password', () => {
+    const saved = process.env.PASSWORD;
+    delete process.env.PASSWORD;
+    try {
+      const { token } = signSession();
+      expect(sessionFromCookieHeader(`${SESSION_COOKIE}=${token}`)).toBe(false);
+    } finally {
+      process.env.PASSWORD = saved;
+    }
   });
 });
 

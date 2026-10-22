@@ -124,7 +124,18 @@ export interface BangumiCalendarResponse {
   days: BangumiCalendarDay[];
 }
 
+export interface AccountUser {
+  id: string;
+  email: string | null;
+  username: string | null;
+  role: 'user' | 'admin';
+  createdAt: number;
+}
+
 export interface AuthStatusResponse {
+  user?: AccountUser | null;
+  registrationMode?: 'open' | 'closed';
+  visitorEnabled?: boolean;
   /** 服务器是否配置了 PASSWORD */
   passwordRequired: boolean;
   /** 当前会话是否已验证 */

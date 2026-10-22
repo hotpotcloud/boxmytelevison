@@ -1,69 +1,86 @@
 'use client';
+import * as Dialog from '@radix-ui/react-dialog';
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, onUnauthorized, STATUS_QUERY_KEY } from '@/lib/client-api';
 import { applyEnvPresets } from '@/lib/subscription-sync';
-import type { AuthStatusResponse } from '@/lib/types';
+import type { AccountUser, AuthStatusResponse } from '@/lib/types';
 import { useToast } from './toast';
-
-/**
- * 认证上下文：
- * - 页面加载时查询 /api/status 判断会话有效性；
- * - 任何 API 返回 401/503 时全局打开登录框（客户端 API 层统一触发，不再散落检查）。
- */
-
-type SetupRequired = boolean;
+import { Icon } from './icon';
 
 interface AuthContextValue {
   checked: boolean;
   verified: boolean;
-  /** 服务器未设置 PASSWORD，需要管理员配置 */
-  setupRequired: SetupRequired;
-  /** /api/status 返回的应用版本（构建时从 package.json 注入） */
+  setupRequired: boolean;
   version: string | null;
+  user: AccountUser | null;
   openLogin: () => void;
   logout: () => Promise<void>;
 }
-
 const AuthContext = createContext<AuthContextValue>({
   checked: false,
   verified: false,
   setupRequired: false,
   version: null,
+  user: null,
   openLogin: () => {},
   logout: async () => {},
 });
-
-export function useAuth(): AuthContextValue {
+export function useAuth() {
   return useContext(AuthContext);
+}
+
+/** Authentication errors stay inside forms instead of reopening the global dialog. */
+export async function accountRequest(action: string, body: Record<string, unknown>) {
+  const response = await fetch(`/api/account/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || '操作失败，请稍后重试');
+  return data;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [user, setUser] = useState<AccountUser | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [version, setVersion] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(true);
+  const [visitorEnabled, setVisitorEnabled] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // 与 Providers 共用同一 query key 与缓存，避免 /api/status 被请求两次
+  const applyStatus = useCallback((status: AuthStatusResponse) => {
+    setVerified(status.verified);
+    setUser(status.user || null);
+    setSetupRequired(!status.passwordRequired);
+    setVersion(status.version);
+    setRegistrationOpen(status.registrationMode !== 'closed');
+    setVisitorEnabled(status.visitorEnabled !== false);
+    setChecked(true);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     queryClient
       .fetchQuery({ queryKey: STATUS_QUERY_KEY, queryFn: () => api.status() })
-      .then((s) => {
+      .then((status) => {
         if (cancelled) return;
-        setVerified(s.verified);
-        setSetupRequired(!s.passwordRequired);
-        setVersion(s.version);
-        setChecked(true);
-        // 直接访问任意页面（如 /live）时，可能没有其他请求触发 401，
-        // 这里在初始状态确认未验证后主动弹出登录框，避免停在"等待访问验证"。
-        if (!s.verified) {
-          setModalOpen(true);
-        }
+        applyStatus(status);
+        if (!status.verified) setModalOpen(true);
       })
       .catch(() => {
         if (!cancelled) setChecked(true);
@@ -71,60 +88,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [queryClient]);
-
+  }, [queryClient, applyStatus]);
   useEffect(
     () =>
       onUnauthorized((event) => {
-        const setup = (event as CustomEvent).detail === 'setup';
-        setSetupRequired(setup);
+        setSetupRequired((event as CustomEvent).detail === 'setup');
         setVerified(false);
+        setUser(null);
         setModalOpen(true);
       }),
-    []
+    [],
   );
 
   const openLogin = useCallback(() => setModalOpen(true), []);
-
   const logout = useCallback(async () => {
-    try {
-      await api.logout();
-    } finally {
-      setVerified(false);
-      toast('已退出登录', 'info');
-    }
-  }, [toast]);
-
-  const handleLoginSuccess = useCallback(async () => {
-    setVerified(true);
-    setSetupRequired(false);
-    setModalOpen(false);
-    // 登录前以 401 失败的查询（如豆瓣推荐）需要重新拉取
-    queryClient.invalidateQueries();
-    toast('验证成功', 'success');
-    // 预置订阅（DEFAULT_SUBSCRIPTIONS）的首屏同步发生在登录之前，会 401 静默失败，
-    // 这里用缓存中的 /api/status 补跑一次（缓存缺失时回落为一次请求）
-    try {
-      const cached = queryClient.getQueryData<AuthStatusResponse>(STATUS_QUERY_KEY);
-      const status =
-        cached ??
-        (await queryClient.fetchQuery<AuthStatusResponse>({
-          queryKey: STATUS_QUERY_KEY,
-          queryFn: () => api.status(),
-          staleTime: 0,
-        }));
-      if (status) await applyEnvPresets(status);
-    } catch {
-      // 补拉预置数据失败不影响登录后的正常使用
-    }
+    await api.logout();
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    setVerified(false);
+    setUser(null);
+    toast('已退出登录', 'info');
   }, [toast, queryClient]);
+  const handleLoginSuccess = useCallback(async () => {
+    const status = await api.status();
+    applyStatus(status);
+    queryClient.setQueryData(STATUS_QUERY_KEY, status);
+    setModalOpen(false);
+    void queryClient.invalidateQueries();
+    toast(status.user ? '欢迎回来' : '访问验证成功', 'success');
+    try {
+      await applyEnvPresets(status);
+    } catch {
+      /* Source availability does not affect authentication. */
+    }
+  }, [applyStatus, queryClient, toast]);
 
   return (
-    <AuthContext.Provider value={{ checked, verified, setupRequired, version, openLogin, logout }}>
+    <AuthContext.Provider
+      value={{ checked, verified, setupRequired, version, user, openLogin, logout }}
+    >
       {children}
       {modalOpen && (
         <LoginModal
           setupRequired={setupRequired}
+          registrationOpen={registrationOpen}
+          visitorEnabled={visitorEnabled}
           onSuccess={handleLoginSuccess}
           onClose={() => setModalOpen(false)}
         />
@@ -135,95 +143,227 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 function LoginModal({
   setupRequired,
+  registrationOpen,
+  visitorEnabled,
   onSuccess,
   onClose,
 }: {
   setupRequired: boolean;
-  onSuccess: () => void;
+  registrationOpen: boolean;
+  visitorEnabled: boolean;
+  onSuccess: () => Promise<void>;
   onClose: () => void;
 }) {
+  const [mode, setMode] = useState<'login' | 'register' | 'visitor'>('login');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [remember, setRemember] = useState(true);
+  const [visiblePassword, setVisiblePassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  const submit = async () => {
-    if (!password.trim() || loading) return;
+  const switchMode = (next: typeof mode) => {
+    setMode(next);
+    setError('');
+    setPassword('');
+    setConfirmation('');
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (loading) return;
+    if (mode === 'register' && password !== confirmation) {
+      setError('两次输入的密码不一致');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      await api.login(password);
-      onSuccess();
+      if (mode === 'visitor') await api.login(password);
+      else await accountRequest(mode, { identifier, email: identifier, password, remember });
+      await onSuccess();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '验证失败';
-      setError(msg === '需要登录' ? '密码错误' : msg);
-      setPassword('');
-      inputRef.current?.focus();
+      setError(err instanceof Error ? err.message : '连接失败，请稍后重试');
     } finally {
       setLoading(false);
     }
   };
-
   return (
-    <div
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 animate-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open && !loading) onClose();
       }}
     >
-      <div
-        className="bg-surface-raised rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-label={setupRequired ? '需要配置密码' : '访问验证'}
-      >
-        {setupRequired ? (
-          <>
-            <h2 className="text-lg font-semibold text-content mb-3">需要配置密码</h2>
-            <p className="text-sm text-muted leading-relaxed">
-              为确保安全，必须设置 <code className="text-accent">PASSWORD</code> 环境变量才能使用本服务。
-              请联系管理员在部署配置中添加该变量后重启服务。
-            </p>
-          </>
-        ) : (
-          <>
-            <h2 className="text-lg font-semibold text-content mb-1">访问验证</h2>
-            <p className="text-sm text-muted mb-4">请输入密码继续访问</p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                submit();
-              }}
-            >
-              <input
-                ref={inputRef}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input w-full"
-                placeholder="密码"
-                autoComplete="current-password"
-              />
-              {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-              <button type="submit" className="btn-primary w-full mt-4" disabled={loading || !password.trim()}>
-                {loading ? '验证中...' : '进入'}
-              </button>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
+      <Dialog.Portal>
+        <Dialog.Overlay className="account-backdrop" />
+        <Dialog.Content
+          className="account-sheet"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            inputRef.current?.focus();
+          }}
+          onEscapeKeyDown={(event) => {
+            if (loading) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            if (loading) event.preventDefault();
+          }}
+        >
+          <button
+            className="account-close"
+            aria-label="关闭登录窗口"
+            onClick={onClose}
+            disabled={loading}
+          >
+            <Icon name="close" />
+          </button>
+          <div className="account-mark" aria-hidden="true">
+            <Icon name="play" className="h-7 w-7" />
+          </div>
+          <p className="eyebrow">LIBRETV ACCOUNT</p>
+          <Dialog.Title className="account-title">
+            {mode === 'register' ? '创建你的账号' : mode === 'visitor' ? '访客访问' : '欢迎回来'}
+          </Dialog.Title>
+          <Dialog.Description className="account-description">
+            {mode === 'register'
+              ? '用常用邮箱注册，让好故事随时继续。'
+              : mode === 'visitor'
+                ? '使用站点访问密码，临时进入观影空间。'
+                : '登录一次，下次打开即可继续观看。'}
+          </Dialog.Description>
+          {setupRequired ? (
+            <p className="account-notice">站点尚未完成初始化，请联系管理员。</p>
+          ) : (
+            <>
+              {mode !== 'visitor' && (
+                <div className="account-segments" aria-label="账号操作">
+                  <button
+                    type="button"
+                    aria-pressed={mode === 'login'}
+                    onClick={() => switchMode('login')}
+                    disabled={loading}
+                  >
+                    登录
+                  </button>
+                  {registrationOpen && (
+                    <button
+                      type="button"
+                      aria-pressed={mode === 'register'}
+                      onClick={() => switchMode('register')}
+                      disabled={loading}
+                    >
+                      注册
+                    </button>
+                  )}
+                </div>
+              )}
+              <form onSubmit={submit} className="account-form">
+                {mode !== 'visitor' && (
+                  <label className="account-field" htmlFor="auth-identifier">
+                    <span>{mode === 'register' ? '邮箱地址' : '邮箱或管理员账号'}</span>
+                    <input
+                      ref={inputRef}
+                      id="auth-identifier"
+                      type={mode === 'register' ? 'email' : 'text'}
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      maxLength={254}
+                      required
+                      value={identifier}
+                      onChange={(event) => setIdentifier(event.target.value)}
+                      placeholder={mode === 'register' ? 'you@example.com' : '邮箱地址或账号'}
+                      aria-describedby={error ? 'auth-error' : undefined}
+                    />
+                  </label>
+                )}
+                <label className="account-field" htmlFor="auth-password">
+                  <span>{mode === 'visitor' ? '访问密码' : '密码'}</span>
+                  <input
+                    ref={mode === 'visitor' ? inputRef : undefined}
+                    id="auth-password"
+                    type={visiblePassword ? 'text' : 'password'}
+                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                    minLength={mode === 'register' ? 8 : undefined}
+                    maxLength={128}
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder={mode === 'register' ? '至少 8 个字符' : '请输入密码'}
+                    aria-describedby={error ? 'auth-error' : undefined}
+                  />
+                </label>
+                {mode === 'register' && (
+                  <label className="account-field" htmlFor="auth-confirmation">
+                    <span>确认密码</span>
+                    <input
+                      id="auth-confirmation"
+                      type={visiblePassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      required
+                      maxLength={128}
+                      value={confirmation}
+                      onChange={(event) => setConfirmation(event.target.value)}
+                      placeholder="再次输入密码"
+                    />
+                  </label>
+                )}
+                <div className="account-options">
+                  {mode !== 'visitor' && (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={remember}
+                        onChange={(event) => setRemember(event.target.checked)}
+                      />
+                      保持登录
+                    </label>
+                  )}
+                  <label className="ml-auto">
+                    <input
+                      type="checkbox"
+                      checked={visiblePassword}
+                      onChange={(event) => setVisiblePassword(event.target.checked)}
+                    />
+                    显示密码
+                  </label>
+                </div>
+                {error && (
+                  <p id="auth-error" className="account-error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <button className="account-submit" type="submit" disabled={loading}>
+                  {loading
+                    ? '正在处理…'
+                    : mode === 'register'
+                      ? '创建账号并登录'
+                      : mode === 'visitor'
+                        ? '验证并进入'
+                        : '登录'}
+                  <span aria-hidden="true">→</span>
+                </button>
+                {mode === 'register' && (
+                  <p className="account-footnote">
+                    邮箱仅用于登录，暂不支持邮件找回密码，请妥善保存密码。
+                  </p>
+                )}
+              </form>
+              {visitorEnabled && (
+                <button
+                  className="account-alternative"
+                  onClick={() => switchMode(mode === 'visitor' ? 'login' : 'visitor')}
+                  disabled={loading}
+                >
+                  {mode === 'visitor' ? '返回账号登录' : '使用访问密码进入'}
+                </button>
+              )}
+            </>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

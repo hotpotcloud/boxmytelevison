@@ -24,10 +24,75 @@ export type IconName =
   | 'link'
   | 'alert'
   | 'gear'
-  | 'home';
+  | 'home'
+  | 'user'
+  | 'play'
+  | 'compass'
+  | 'film'
+  | 'tv'
+  | 'broadcast'
+  | 'heart'
+  | 'database'
+  | 'info';
 
 const PATHS: Record<IconName, ReactNode> = {
-  close: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />,
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="9" strokeWidth={1.6} />
+      <path d="m16 8-2.5 5.5L8 16l2.5-5.5L16 8Z" strokeWidth={1.6} />
+    </>
+  ),
+  film: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="3" strokeWidth={1.6} />
+      <path d="M7 4v16M17 4v16M3 9h4m-4 6h4m10-6h4m-4 6h4" strokeWidth={1.6} />
+    </>
+  ),
+  tv: (
+    <>
+      <rect x="3" y="6" width="18" height="14" rx="3" strokeWidth={1.6} />
+      <path d="m8 2 4 4 4-4M9 23h6" strokeWidth={1.6} strokeLinecap="round" />
+    </>
+  ),
+  broadcast: (
+    <>
+      <circle cx="12" cy="12" r="2" strokeWidth={1.6} />
+      <path
+        d="M7 7a7 7 0 0 0 0 10m10-10a7 7 0 0 1 0 10M4 4a11 11 0 0 0 0 16M20 4a11 11 0 0 1 0 16"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+    </>
+  ),
+  heart: (
+    <path
+      d="M20.4 5.6a5 5 0 0 0-7.1 0L12 6.9l-1.3-1.3a5 5 0 0 0-7.1 7.1L12 21l8.4-8.3a5 5 0 0 0 0-7.1Z"
+      strokeWidth={1.6}
+      strokeLinejoin="round"
+    />
+  ),
+  database: (
+    <>
+      <ellipse cx="12" cy="5" rx="8" ry="3" strokeWidth={1.6} />
+      <path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0" strokeWidth={1.6} />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" strokeWidth={1.6} />
+      <path d="M12 11v6M12 7v.1" strokeWidth={1.8} strokeLinecap="round" />
+    </>
+  ),
+  user: (
+    <>
+      <circle cx="12" cy="8" r="3.5" strokeWidth={1.7} />
+      <path d="M5 21v-2a7 7 0 0 1 14 0v2" strokeWidth={1.7} strokeLinecap="round" />
+    </>
+  ),
+  play: <path d="m9 5 11 7-11 7V5Z" strokeWidth={1.7} strokeLinejoin="round" />,
+  close: (
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  ),
   edit: (
     <path
       strokeLinecap="round"
@@ -60,8 +125,17 @@ const PATHS: Record<IconName, ReactNode> = {
       d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
     />
   ),
-  chevronDown: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19.5 8.25-7.5 7.5-7.5-7.5" />,
-  plus: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" />,
+  chevronDown: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="m19.5 8.25-7.5 7.5-7.5-7.5"
+    />
+  ),
+  plus: (
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" />
+  ),
   search: (
     <path
       strokeLinecap="round"
@@ -78,9 +152,16 @@ const PATHS: Record<IconName, ReactNode> = {
       d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
     />
   ),
-  check: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m4.5 12.75 6 6 9-13.5" />,
+  check: (
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m4.5 12.75 6 6 9-13.5" />
+  ),
   arrowDown: (
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M19 14l-7 7m0 0l-7-7m7 7V3"
+    />
   ),
   undo: (
     <path
@@ -130,7 +211,12 @@ const PATHS: Record<IconName, ReactNode> = {
         strokeWidth={2}
         d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z"
       />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+      />
     </>
   ),
   home: (

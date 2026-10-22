@@ -20,7 +20,7 @@ install -d -m 700 "$release"
 tar -xzf app.tar.gz -C "$release"
 # Reuse Node 22 when present; otherwise install it once on the server.
 node_bin=$(command -v node || true)
-if [ -z "$node_bin" ] || ! "$node_bin" -e 'process.exit(Number(process.versions.node.split(".")[0]) === 22 ? 0 : 1)'; then
+if [ -z "$node_bin" ] || ! "$node_bin" -e 'try { const [major,minor]=process.versions.node.split(".").map(Number); process.exit(major===22 && minor>=13 && process.getBuiltinModule("node:sqlite") ? 0 : 1); } catch { process.exit(1); }'; then
   node_version=$(cat "$release/.node-version")
   node_sha=$(cat "$release/.node-sha256")
   [[ "$node_version" =~ ^v22\.[0-9]+\.[0-9]+$ ]]
@@ -48,6 +48,15 @@ if [ -z "$node_bin" ] || ! "$node_bin" -e 'process.exit(Number(process.versions.
 fi
 "$node_bin" --version
 printf '%s\n' "$node_bin" > "$release/.node-path"
+# Persistent data is outside releases. Back up an existing SQLite DB consistently before migration.
+install -d -m 700 "$app_dir/data" "$app_dir/backups"
+export DATABASE_PATH="$app_dir/data/accounts.sqlite"
+if [ -f "$DATABASE_PATH" ]; then
+  backup_db="$app_dir/backups/accounts-$(basename "$stage").sqlite"
+  "$node_bin" -e 'const {DatabaseSync}=require("node:sqlite");const db=new DatabaseSync(process.argv[1]);try{db.exec("PRAGMA busy_timeout=5000");db.prepare("VACUUM INTO ?").run(process.argv[2]);}finally{db.close();}' "$DATABASE_PATH" "$backup_db"
+  chmod 600 "$backup_db"
+  echo 'Consistent database backup completed'
+fi
 chmod 600 "$release/.env" "$release/password.json"
 test -f "$release/server.js"
 test -f "$release/start.cjs"
@@ -67,6 +76,7 @@ WorkingDirectory=$release
 ExecStart=$node_bin --env-file=.env start.cjs
 Environment=NODE_OPTIONS=--max-old-space-size=768
 Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=DATABASE_PATH=$app_dir/data/accounts.sqlite
 Restart=on-failure
 RestartSec=5
 UMask=0077
@@ -103,6 +113,7 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 [ "$healthy" = 1 ] || rollback
-echo 'Deployment succeeded: service active, API reachable, password configured'
+"$node_bin" "$release/verify-accounts.cjs" || rollback
+echo 'Deployment succeeded: service active, API reachable, accounts verified'
 # Retain releases so restoring the previous service also restores its application files.
 rm -f "$stage/app.tar.gz" "$stage/app.tar.gz.sha256" "$backup" "$stage/status.json"

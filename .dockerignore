@@ -20,3 +20,9 @@ docker-compose.yml
 docs
 README.md
 LICENSE
+# Accounts are server-side files and must never enter an image/build context.
+data/
+.tmp/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

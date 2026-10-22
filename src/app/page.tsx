@@ -3,15 +3,23 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/components/auth';
+import { Pagination } from '@/components/pagination';
+import { pageNumber, pageSize } from '@/lib/pagination';
 import { Header } from '@/components/header';
 import { RecommendSection } from '@/components/douban-section';
 import { DetailModal } from '@/components/detail-modal';
 import { AggregatedCard, aggregateResults } from '@/components/video-card';
-import { useAppStore, resolveSource, isInDisabledSubscription, isSourceDisabled } from '@/lib/store';
+import {
+  useAppStore,
+  resolveSource,
+  isInDisabledSubscription,
+  isSourceDisabled,
+} from '@/lib/store';
 import { api } from '@/lib/client-api';
 import type { SearchResultItem, SourceSearchOutcome } from '@/lib/types';
-import { SearchHistoryDropdown, useSearchHistory } from '@/components/search-history';
-import { cn, formatDisableTtl, validateSourceUrl } from '@/lib/utils';
+import { useSearchHistory } from '@/components/search-history';
+import { formatDisableTtl, validateSourceUrl } from '@/lib/utils';
 import { useToast } from '@/components/toast';
 import { EmptyState } from '@/components/states';
 import { Icon } from '@/components/icon';
@@ -22,7 +30,6 @@ import { SiteFooter } from '@/components/site-footer';
  * 搜索状态由 React Query 管理，失败源在结果区顶部以非阻塞方式展示。
  */
 /** 搜索结果分批渲染的批大小：一次挂载上千张卡片会明显掉帧 */
-const RESULT_PAGE_SIZE = 60;
 
 export default function HomePage() {
   return (
@@ -34,6 +41,7 @@ export default function HomePage() {
 
 function HomeContent() {
   const searchParams = useSearchParams();
+  const { verified, openLogin } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const urlQuery = searchParams.get('s') || '';
@@ -65,29 +73,33 @@ function HomeContent() {
   const selectedSources = useMemo(() => {
     // selectedKeys 可能含历史残留的重复 key：按 key 去重，避免同源重复搜索
     const seen = new Set<string>();
-    return selectedKeys
-      .map((key) => resolveSource({ customAPIs, envSources }, key))
-      .filter((s): s is NonNullable<typeof s> => {
-        if (!s || !validateSourceUrl(s.url) || seen.has(s.key)) return false;
-        seen.add(s.key);
-        return true;
-      })
-      // 自动停用期内的源不参与搜索（到期自动恢复）
-      .filter((s) => !isSourceDisabled({ sourceHealth }, s.key))
-      // 所属订阅被整体停用的源同样跳过（无损：各源勾选状态保留，重新启用即恢复）
-      .filter((s) => !isInDisabledSubscription({ subscriptions }, s.key));
+    return (
+      selectedKeys
+        .map((key) => resolveSource({ customAPIs, envSources }, key))
+        .filter((s): s is NonNullable<typeof s> => {
+          if (!s || !validateSourceUrl(s.url) || seen.has(s.key)) return false;
+          seen.add(s.key);
+          return true;
+        })
+        // 自动停用期内的源不参与搜索（到期自动恢复）
+        .filter((s) => !isSourceDisabled({ sourceHealth }, s.key))
+        // 所属订阅被整体停用的源同样跳过（无损：各源勾选状态保留，重新启用即恢复）
+        .filter((s) => !isInDisabledSubscription({ subscriptions }, s.key))
+    );
   }, [customAPIs, envSources, selectedKeys, sourceHealth, subscriptions]);
   const disabledSources = useMemo(
     () => selectedKeys.filter((key) => isSourceDisabled({ sourceHealth }, key)),
-    [selectedKeys, sourceHealth]
+    [selectedKeys, sourceHealth],
   );
   // 来自已关闭订阅的源：勾选状态还在，但本次搜索用不到，必须明确告知
   const offSubscriptionSources = useMemo(
     () =>
       selectedKeys.filter(
-        (key) => !isSourceDisabled({ sourceHealth }, key) && isInDisabledSubscription({ subscriptions }, key)
+        (key) =>
+          !isSourceDisabled({ sourceHealth }, key) &&
+          isInDisabledSubscription({ subscriptions }, key),
       ),
-    [selectedKeys, sourceHealth, subscriptions]
+    [selectedKeys, sourceHealth, subscriptions],
   );
 
   const searchQuery = useQuery({
@@ -105,13 +117,13 @@ function HomeContent() {
               ev.permanent
                 ? `「${sourceName(ev.key)}」多次失败，已停止参与搜索，可在设置中恢复`
                 : `「${sourceName(ev.key)}」连续超时/失败，已停用 ${formatDisableTtl(ev.ttlMs ?? 0)}`,
-              'warning'
+              'warning',
             );
           }
         },
       });
     },
-    enabled: Boolean(urlQuery) && selectedSources.length > 0,
+    enabled: verified && Boolean(urlQuery) && selectedSources.length > 0,
     // 5 分钟内从播放页返回时直接使用缓存，不重新搜索（服务端另有 60s 结果缓存兜底）
     staleTime: 300_000,
   });
@@ -134,21 +146,12 @@ function HomeContent() {
     searchHistory.record(query);
   };
 
-  const pickHistory = (text: string) => {
-    setInput(text);
-    searchHistory.close();
-    runSearch(text);
-  };
-
   const isSearching = Boolean(urlQuery) && searchQuery.isFetching && !searchQuery.data;
   // 聚合数据未就绪时，用已结算源的结果增量渲染（健康源不再等坏源超时）
-  const streamedList = useMemo(
-    () => streamedOutcomes.flatMap((o) => o.list),
-    [streamedOutcomes]
-  );
+  const streamedList = useMemo(() => streamedOutcomes.flatMap((o) => o.list), [streamedOutcomes]);
   const list = useMemo(
     () => searchQuery.data?.list ?? (isSearching ? streamedList : []),
-    [searchQuery.data, isSearching, streamedList]
+    [searchQuery.data, isSearching, streamedList],
   );
   const failures =
     searchQuery.data?.failures ??
@@ -158,127 +161,81 @@ function HomeContent() {
   // 跨源同名聚合：同名影片合并为一张卡片，展开后可选择具体来源
   const groups = useMemo(() => aggregateResults(list), [list]);
 
-  // 分批渲染：新一次搜索（groups 变化）时重置回首批
-  const [visibleCount, setVisibleCount] = useState(RESULT_PAGE_SIZE);
-  const visibleGroups = useMemo(() => groups.slice(0, visibleCount), [groups, visibleCount]);
-  useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [groups]);
+  const size = pageSize(searchParams.get('size'));
+  const typeFilter = searchParams.get('type') || '';
+  const yearFilter = searchParams.get('year') || '';
+  const areaFilter = searchParams.get('area') || '';
+  const sort = searchParams.get('sort') || 'default';
+  const filteredGroups = useMemo(() => {
+    const filtered = groups.filter(
+      (group) =>
+        (!typeFilter || group.items.some((item) => item.typeName === typeFilter)) &&
+        (!yearFilter || group.year === yearFilter) &&
+        (!areaFilter || group.items.some((item) => item.area === areaFilter)),
+    );
+    if (sort === 'title') filtered.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+    if (sort === 'year') filtered.sort((a, b) => (Number(b.year) || 0) - (Number(a.year) || 0));
+    return filtered;
+  }, [groups, typeFilter, yearFilter, areaFilter, sort]);
+  const page = Math.min(
+    pageNumber(searchParams.get('page')),
+    Math.max(1, Math.ceil(filteredGroups.length / size)),
+  );
+  const visibleGroups = filteredGroups.slice((page - 1) * size, page * size);
+  const filterOptions = {
+    type: [...new Set(list.map((item) => item.typeName).filter(Boolean))] as string[],
+    year: [...new Set(list.map((item) => item.year).filter(Boolean))].sort().reverse() as string[],
+    area: [...new Set(list.map((item) => item.area).filter(Boolean))] as string[],
+  };
+  const changeResults = (patch: Record<string, string>, reset = true) => {
+    const next = new URLSearchParams(searchParams.toString());
+    Object.entries(patch).forEach(([key, value]) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    });
+    if (reset) next.delete('page');
+    router.push('/?' + next.toString(), { scroll: false });
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      <Header showSearch />
 
-      <main className="relative flex-1 max-w-6xl w-full mx-auto px-4 py-6">
-        {/* 首屏氛围渐变 */}
-        {!urlQuery && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 h-[420px] -z-10"
-            style={{
-              background:
-                'radial-gradient(60% 60% at 50% 0%, rgba(35,173,229,0.10) 0%, rgba(35,173,229,0.03) 45%, transparent 75%)',
+      <main className="app-content">
+        <header className="discovery-heading">
+          <h1>
+            {urlQuery
+              ? '查找你的下一部好故事'
+              : searchParams.get('category') === 'movie'
+                ? '把时间，留给好电影。'
+                : searchParams.get('category') === 'tv'
+                  ? '好故事，不止一集。'
+                  : '今天，想看点什么？'}
+          </h1>
+          <p>{urlQuery ? '多源聚合搜索，选择适合你的播放来源。' : '好故事，随时开场。'}</p>
+        </header>
+        {urlQuery && (
+          <form
+            className="flex gap-3 mb-6 max-w-2xl"
+            onSubmit={(event) => {
+              event.preventDefault();
+              runSearch(input);
             }}
-          />
+          >
+            <input
+              ref={inputRef}
+              className="input flex-1 min-w-0 min-h-11"
+              aria-label="修改搜索关键词"
+              maxLength={100}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+            />
+            <button className="btn-primary px-5 min-h-11" type="submit">
+              <Icon name="search" className="w-4 h-4" />
+              搜索
+            </button>
+          </form>
         )}
-
-        {/* 搜索区 */}
-        <section className={cn('flex flex-col items-center', urlQuery ? 'mb-6' : 'mt-8 mb-8')}>
-          {!urlQuery && (
-            <header className="text-center mb-6">
-              <h1 className="text-4xl sm:text-5xl font-bold brand-gradient">LibreTV</h1>
-            </header>
-          )}
-          {urlQuery && <h1 className="sr-only">LibreTV 视频搜索</h1>}
-          {/* 定位容器比胶囊宽一圈：浮层按它的宽度对齐，接缝处不会与胶囊边框错位 1px */}
-          <div ref={searchHistory.containerRef} className="relative w-full max-w-2xl">
-            <form
-              className="w-full"
-              onSubmit={(e) => {
-                e.preventDefault();
-                runSearch(input);
-              }}
-            >
-              {/* 输入框与搜索按钮合并为一个胶囊：内部无边框，焦点态由容器统一表达；
-                  下拉展开时改为「上圆下直」并隐去底边，与下方浮层拼成同一个面板 */}
-              <div
-                className={cn(
-                  // 12px 圆角矩形（非胶囊）：收起态与展开态共用同一组上圆角，
-                  // 展开时输入框这部分形状完全不发生变化，上下圆角也与下拉保持一致；
-                  // 右侧与上下不留内边距，由搜索按钮拉伸填满、与搜索框边缘贴合
-                  'flex items-stretch min-h-12 pl-4 border',
-                  'transition-[background-color,border-color,border-radius] duration-200',
-                  searchHistory.visible
-                    ? // 展开时：外框（含上圆角）沿用输入框的聚焦样式不变，只把底边改为内部分隔线，
-                      // 使输入区在展开状态下仍是边界清晰的独立输入框，而非与列表糊成一片
-                      'rounded-t-xl rounded-b-none border-accent border-b-line bg-surface-raised'
-                    : 'rounded-xl border-line bg-chip focus-within:border-accent focus-within:ring-1 focus-within:ring-accent/40'
-                )}
-              >
-                <input
-                  ref={inputRef}
-                  className="flex-1 min-w-0 pr-2 bg-transparent text-sm text-content placeholder:text-faint focus:outline-none"
-                  placeholder="输入影片名称..."
-                  value={input}
-                  maxLength={100}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    searchHistory.resetActive();
-                  }}
-                  onFocus={searchHistory.onFocus}
-                  onKeyDown={(e) => searchHistory.onKeyDown(e, pickHistory)}
-                  role="combobox"
-                  aria-label="搜索影片"
-                  aria-expanded={searchHistory.visible}
-                  aria-controls="home-search-history"
-                  aria-autocomplete="list"
-                  aria-activedescendant={
-                    searchHistory.visible && searchHistory.activeIndex >= 0
-                      ? `home-search-history-${searchHistory.activeIndex}`
-                      : undefined
-                  }
-                />
-                {input && (
-                  <button
-                    type="button"
-                    className="shrink-0 self-center mr-1 p-1.5 rounded-full text-faint hover:text-content hover:bg-hover transition-colors"
-                    onClick={() => {
-                      setInput('');
-                      searchHistory.resetActive();
-                      inputRef.current?.focus();
-                    }}
-                    aria-label="清空"
-                  >
-                    <Icon name="close" className="w-4 h-4" />
-                  </button>
-                )}
-                {/* 主操作按钮：贴合搜索框右端——右侧圆角跟随容器、左侧直角，展开时右下角
-                    跟着容器一起改直角；按压改用亮度反馈（缩放会让贴合边缘露出缝隙） */}
-                <button
-                  type="submit"
-                  className={cn(
-                    'btn-primary shrink-0 px-4 font-medium transition-[background-color,filter] active:brightness-90',
-                    '!rounded-l-none',
-                    searchHistory.visible ? '!rounded-tr-xl !rounded-br-none' : '!rounded-r-xl'
-                  )}
-                >
-                  <Icon name="search" className="w-4 h-4" />
-                  搜索
-                </button>
-              </div>
-            </form>
-
-            {/* 最近搜索：与输入框无缝拼接；浮层不占文档流，出现/消失不会顶动下方内容 */}
-            {searchHistory.visible && (
-              <SearchHistoryDropdown
-                id="home-search-history"
-                matches={searchHistory.matches}
-                activeIndex={searchHistory.activeIndex}
-                onPick={pickHistory}
-                onRemove={searchHistory.remove}
-                onClearAll={searchHistory.clearAll}
-              />
-            )}
-          </div>
-        </section>
 
         {/* 搜索结果 */}
         {urlQuery && (
@@ -293,7 +250,8 @@ function HomeContent() {
                 ) : (
                   searchQuery.data && (
                     <span className="text-faint">
-                      （{groups.length} 部影片 · {list.length} 条结果{failures.length > 0 && `，${failures.length} 个源失败`}）
+                      （{groups.length} 部影片 · {list.length} 条结果
+                      {failures.length > 0 && `，${failures.length} 个源失败`}）
                     </span>
                   )
                 )}
@@ -302,7 +260,9 @@ function HomeContent() {
 
             {failures.length > 0 && (
               <div className="mb-3 text-xs bg-chip rounded-lg px-3 py-2 flex flex-wrap gap-x-3 gap-y-1">
-                <span className="text-faint">{isSearching ? '以下源暂时无响应：' : '部分点播源请求失败：'}</span>
+                <span className="text-faint">
+                  {isSearching ? '以下源暂时无响应：' : '部分点播源请求失败：'}
+                </span>
                 {failures.map((f) => (
                   <span key={f.sourceKey} className={f.timedOut ? 'text-warning' : 'text-faint'}>
                     {f.timedOut ? '⏱' : '✗'} {sourceName(f.sourceKey)}
@@ -315,20 +275,60 @@ function HomeContent() {
             {disabledSources.length > 0 && (
               <div className="mb-3 text-xs text-faint bg-chip rounded-lg px-3 py-2">
                 {disabledSources.length} 个源因连续超时/失败已暂停参与搜索（临时停用的到期自动恢复，
-                长期停用的需在设置中手动恢复）：{disabledSources.map((key) => sourceName(key)).join('、')}
+                长期停用的需在设置中手动恢复）：
+                {disabledSources.map((key) => sourceName(key)).join('、')}
               </div>
             )}
 
             {offSubscriptionSources.length > 0 && (
               <div className="mb-3 text-xs text-faint bg-chip rounded-lg px-3 py-2">
-                {offSubscriptionSources.length} 个源所属的订阅已停用，未参与本次搜索（在设置 → 数据源订阅中可重新启用）：
+                {offSubscriptionSources.length} 个源所属的订阅已停用，未参与本次搜索（在设置 →
+                数据源订阅中可重新启用）：
                 {offSubscriptionSources.map((key) => sourceName(key)).join('、')}
               </div>
             )}
 
-            {selectedSources.length === 0 ? (
+            <div className="search-filters" aria-label="搜索筛选">
+              {(['type', 'year', 'area'] as const).map((key) => (
+                <select
+                  key={key}
+                  aria-label={
+                    key === 'type' ? '筛选类型' : key === 'year' ? '筛选年份' : '筛选地区'
+                  }
+                  value={searchParams.get(key) || ''}
+                  onChange={(event) => changeResults({ [key]: event.target.value })}
+                >
+                  <option value="">
+                    {key === 'type' ? '全部类型' : key === 'year' ? '全部年份' : '全部地区'}
+                  </option>
+                  {filterOptions[key].map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              ))}
+              <select
+                aria-label="搜索结果排序"
+                value={sort}
+                onChange={(event) => changeResults({ sort: event.target.value })}
+              >
+                <option value="default">默认排序</option>
+                <option value="year">年份从新到旧</option>
+                <option value="title">按片名排序</option>
+              </select>
+            </div>
+            {!verified ? (
+              <div className="library-state">
+                <h2>登录后开始搜索</h2>
+                <p>用个人账号登录，或使用站点访问密码进入。</p>
+                <button className="btn-primary min-h-11" onClick={openLogin}>
+                  登录 / 注册
+                </button>
+              </div>
+            ) : selectedSources.length === 0 ? (
               <NoSourceGuide hasSources={customAPIs.length > 0 || envSources.length > 0} />
-            ) : list.length > 0 ? (
+            ) : filteredGroups.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
                   {visibleGroups.map((group) => (
@@ -340,23 +340,20 @@ function HomeContent() {
                     />
                   ))}
                 </div>
-                {groups.length > visibleCount && (
-                  <div className="flex justify-center mt-4">
-                    <button
-                      className="btn-ghost btn-sm"
-                      onClick={() => setVisibleCount((v) => v + RESULT_PAGE_SIZE)}
-                    >
-                      加载更多（还有 {groups.length - visibleCount} 部）
-                    </button>
-                  </div>
-                )}
+                <Pagination
+                  total={filteredGroups.length}
+                  page={page}
+                  size={size}
+                  onPage={(next) => changeResults({ page: String(next) }, false)}
+                  onSize={(next) => changeResults({ size: String(next) })}
+                />
               </>
             ) : isSearching ? (
               <ResultsSkeleton />
             ) : (
               <EmptyState
                 icon="search"
-                title="没有找到匹配的结果"
+                title={list.length ? '当前筛选没有匹配结果' : '没有找到匹配的结果'}
                 description="请尝试其他关键词或更换点播源"
                 className="!py-16"
               />
@@ -404,14 +401,17 @@ function ResultsSkeleton() {
 function NoSourceGuide({ hasSources = false }: { hasSources?: boolean }) {
   return (
     <div className="border border-dashed border-line rounded-xl p-10 text-center max-w-lg mx-auto">
-      <h3 className="text-content font-medium mb-2">{hasSources ? '尚未勾选点播源' : '先添加一个点播源'}</h3>
+      <h3 className="text-content font-medium mb-2">
+        {hasSources ? '尚未勾选点播源' : '先添加一个点播源'}
+      </h3>
       <p className="text-sm text-muted leading-relaxed">
         {hasSources ? (
           <>点击右上角「设置」，勾选要参与搜索的点播源后重新搜索。</>
         ) : (
           <>
-            LibreTV 不内置任何采集站。点击右上角「设置 → 添加 API」，填入一个
-            Apple CMS 采集站地址（如 <code className="text-accent text-xs">https://example.com/api.php/provide/vod</code>），
+            LibreTV 不内置任何采集站。点击右上角「设置 → 添加 API」，填入一个 Apple CMS
+            采集站地址（如{' '}
+            <code className="text-accent text-xs">https://example.com/api.php/provide/vod</code>），
             勾选后即可开始搜索。
           </>
         )}

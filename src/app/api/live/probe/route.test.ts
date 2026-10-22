@@ -2,6 +2,11 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { POST } from './route';
 import { SESSION_COOKIE, signSession } from '@/lib/auth';
 
+// Fetch is mocked below; keep reserved test domains independent of real DNS too.
+vi.mock('node:dns/promises', () => ({
+  default: { lookup: vi.fn(async () => [{ address: '8.8.8.8', family: 4 }]) },
+}));
+
 /**
  * 测活接口单测：流式 NDJSON、codec 解析、内容校验、结果缓存、内网放行。
  * 上游一律用 mock fetch，不产生真实网络请求。
@@ -140,7 +145,7 @@ describe('POST /api/live/probe', () => {
           status: 200,
           headers: { 'content-type': 'video/mp4' },
         });
-      })
+      }),
     );
     const res = await POST(makeRequest(['https://tv.test/channel/expired?token=x'], true));
     const [line] = await readNdjson(res);
@@ -163,7 +168,7 @@ describe('POST /api/live/probe', () => {
           return jsonRes(MEDIA, 'application/vnd.apple.mpegurl');
         }
         return new Response('x', { status: 206, headers: { 'content-type': 'video/mp2t' } });
-      })
+      }),
     );
     const res = await POST(makeRequest(['https://cdn.ok.test/entry?token=x'], true));
     const [line] = await readNdjson(res);
@@ -174,10 +179,13 @@ describe('POST /api/live/probe', () => {
   it('直链 MP4 只标记为 head（可达但未验证可播性）', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('mp4-bytes', {
-        status: 200,
-        headers: { 'content-type': 'video/mp4' },
-      }))
+      vi.fn(
+        async () =>
+          new Response('mp4-bytes', {
+            status: 200,
+            headers: { 'content-type': 'video/mp4' },
+          }),
+      ),
     );
     const res = await POST(makeRequest(['https://direct.test/live/stream?id=1'], true));
     const [line] = await readNdjson(res);
@@ -210,7 +218,7 @@ describe('POST /api/live/probe', () => {
           status: 206,
           headers: { 'content-type': 'video/mp2t' },
         });
-      })
+      }),
     );
 
     const res = await POST(makeRequest(['https://newest.test/live/index.m3u8'], true));
@@ -239,14 +247,14 @@ describe('POST /api/live/probe', () => {
           }
           return jsonRes(
             url.includes('master.m3u8') ? MASTER : MEDIA,
-            'application/vnd.apple.mpegurl'
+            'application/vnd.apple.mpegurl',
           );
         }
         return new Response('x', {
           status: headers.Range ? 206 : 200,
           headers: { 'content-type': 'video/mp2t' },
         });
-      })
+      }),
     );
 
     const res = await POST(makeRequest(['https://range.test/live/master.m3u8'], true));
@@ -254,7 +262,9 @@ describe('POST /api/live/probe', () => {
     expect(line.ok).toBe(true);
     expect(line.level).toBe('segment');
 
-    const manifestCalls = seen.filter((s) => s.url.includes('/live/') && !s.url.includes('seg1.ts'));
+    const manifestCalls = seen.filter(
+      (s) => s.url.includes('/live/') && !s.url.includes('seg1.ts'),
+    );
     expect(manifestCalls.length).toBeGreaterThan(0);
     expect(manifestCalls.every((c) => !c.range)).toBe(true);
 
@@ -262,7 +272,9 @@ describe('POST /api/live/probe', () => {
     expect(segmentCalls.length).toBeGreaterThan(0);
     // 可达性检查 bytes=0-1（收到响应头即 cancel）+ 吞吐采样 bytes=0-131071
     expect(segmentCalls.some((c) => c.range === 'bytes=0-1')).toBe(true);
-    expect(segmentCalls.every((c) => c.range === 'bytes=0-1' || c.range === 'bytes=0-131071')).toBe(true);
+    expect(segmentCalls.every((c) => c.range === 'bytes=0-1' || c.range === 'bytes=0-131071')).toBe(
+      true,
+    );
   });
 
   it('未开启 LIVE_ALLOW_PRIVATE 时拒绝内网地址', async () => {
@@ -278,7 +290,7 @@ describe('POST /api/live/probe', () => {
     process.env.LIVE_ALLOW_PRIVATE = '1';
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => jsonRes(MASTER, 'application/vnd.apple.mpegurl'))
+      vi.fn(async () => jsonRes(MASTER, 'application/vnd.apple.mpegurl')),
     );
     try {
       const res = await POST(makeRequest(['http://192.168.1.10:8080/iptv/master.m3u8'], true));

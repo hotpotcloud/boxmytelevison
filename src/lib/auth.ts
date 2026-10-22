@@ -1,3 +1,4 @@
+import { accountFromCookie } from './accounts';
 import crypto from 'node:crypto';
 
 /**
@@ -22,7 +23,10 @@ export function isPasswordConfigured(): boolean {
 
 function getSecret(): string {
   if (process.env.PROXY_SECRET) return process.env.PROXY_SECRET;
-  return crypto.createHash('sha256').update(getPassword() + ':libretv::session-salt').digest('hex');
+  return crypto
+    .createHash('sha256')
+    .update(getPassword() + ':libretv::session-salt')
+    .digest('hex');
 }
 
 function hmac(payload: string): string {
@@ -64,13 +68,19 @@ export function checkPassword(input: string): boolean {
 /** 从请求 Cookie 中解析会话 */
 export function sessionFromCookieHeader(cookieHeader: string | null): boolean {
   if (!cookieHeader) return false;
+  if (accountFromCookie(cookieHeader)) return true;
+  if (!isPasswordConfigured()) return false;
   const cookies = cookieHeader.split(';');
   for (const c of cookies) {
     const eq = c.indexOf('=');
     if (eq === -1) continue;
     const name = c.slice(0, eq).trim();
     if (name === SESSION_COOKIE) {
-      return verifySession(decodeURIComponent(c.slice(eq + 1).trim()));
+      try {
+        return verifySession(decodeURIComponent(c.slice(eq + 1).trim()));
+      } catch {
+        return false;
+      }
     }
   }
   return false;

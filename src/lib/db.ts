@@ -70,7 +70,17 @@ export interface DownloadTaskEntry {
   updatedAt: number;
 }
 
+export interface FavoriteEntry {
+  id: string;
+  title: string;
+  cover: string;
+  rating?: string;
+  isTv?: boolean;
+  createdAt: number;
+}
+
 export const db = new Dexie('libretv') as Dexie & {
+  favorites: EntityTable<FavoriteEntry, 'id'>;
   history: EntityTable<HistoryEntry, 'id'>;
   progress: EntityTable<ProgressEntry, 'key'>;
   searchHistory: EntityTable<SearchHistoryEntry, 'text'>;
@@ -96,6 +106,8 @@ db.version(3).stores({
   downloads: 'id, createdAt',
 });
 
+db.version(4).stores({ favorites: 'id, createdAt' });
+
 export const MAX_HISTORY = 100;
 export const MAX_SEARCH_HISTORY = 10;
 
@@ -106,7 +118,8 @@ export async function upsertHistory(entry: Omit<HistoryEntry, 'id'>): Promise<vo
     ...existing,
     ...entry,
     id,
-    playbackPosition: entry.playbackPosition > 10 ? entry.playbackPosition : existing?.playbackPosition ?? 0,
+    playbackPosition:
+      entry.playbackPosition > 10 ? entry.playbackPosition : (existing?.playbackPosition ?? 0),
     duration: entry.duration || existing?.duration || 0,
     timestamp: Date.now(),
   };
@@ -114,7 +127,10 @@ export async function upsertHistory(entry: Omit<HistoryEntry, 'id'>): Promise<vo
   // 淘汰最旧记录
   const count = await db.history.count();
   if (count > MAX_HISTORY) {
-    const oldest = await db.history.orderBy('timestamp').limit(count - MAX_HISTORY).toArray();
+    const oldest = await db.history
+      .orderBy('timestamp')
+      .limit(count - MAX_HISTORY)
+      .toArray();
     await db.history.bulkDelete(oldest.map((o) => o.id));
   }
 }
@@ -123,12 +139,16 @@ export async function updateHistoryProgress(
   sourceKey: string,
   vodId: string,
   position: number,
-  duration: number
+  duration: number,
 ): Promise<void> {
   const id = `${sourceKey}_${vodId}`;
   const existing = await db.history.get(id);
   if (!existing) return;
-  if (Math.abs(existing.playbackPosition - position) < 2 && Math.abs(existing.duration - duration) < 2) return;
+  if (
+    Math.abs(existing.playbackPosition - position) < 2 &&
+    Math.abs(existing.duration - duration) < 2
+  )
+    return;
   await db.history.update(id, {
     playbackPosition: position,
     duration,
@@ -149,7 +169,13 @@ export function progressKeyOf(sourceKey: string, vodId: string, episodeIndex: nu
   return `${sourceKey}_${vodId}_${episodeIndex}`;
 }
 
-export async function saveProgress(sourceKey: string, vodId: string, episodeIndex: number, position: number, duration: number): Promise<void> {
+export async function saveProgress(
+  sourceKey: string,
+  vodId: string,
+  episodeIndex: number,
+  position: number,
+  duration: number,
+): Promise<void> {
   if (!duration || position < 1) return;
   await db.progress.put({
     key: progressKeyOf(sourceKey, vodId, episodeIndex),
@@ -159,7 +185,11 @@ export async function saveProgress(sourceKey: string, vodId: string, episodeInde
   });
 }
 
-export async function clearProgress(sourceKey: string, vodId: string, episodeIndex: number): Promise<void> {
+export async function clearProgress(
+  sourceKey: string,
+  vodId: string,
+  episodeIndex: number,
+): Promise<void> {
   await db.progress.delete(progressKeyOf(sourceKey, vodId, episodeIndex));
 }
 
@@ -169,7 +199,10 @@ export async function addSearchHistory(text: string): Promise<void> {
   await db.searchHistory.put({ text: t, timestamp: Date.now() });
   const count = await db.searchHistory.count();
   if (count > MAX_SEARCH_HISTORY) {
-    const oldest = await db.searchHistory.orderBy('timestamp').limit(count - MAX_SEARCH_HISTORY).toArray();
+    const oldest = await db.searchHistory
+      .orderBy('timestamp')
+      .limit(count - MAX_SEARCH_HISTORY)
+      .toArray();
     await db.searchHistory.bulkDelete(oldest.map((o) => o.text));
   }
 }
